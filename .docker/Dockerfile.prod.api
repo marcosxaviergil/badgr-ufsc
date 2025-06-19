@@ -1,0 +1,76 @@
+# Stage 1: Build dependencies
+FROM python:3.8-slim as builder
+
+# Configurar locale UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV PYTHONIOENCODING=UTF-8
+
+WORKDIR /build
+
+# Install build dependencies including locales
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential \
+        default-libmysqlclient-dev \
+        libjpeg-dev \
+        zlib1g-dev \
+        libfreetype6-dev \
+        libffi-dev \
+        libcairo2-dev \
+        python3-dev \
+        locales && \
+    locale-gen en_US.UTF-8 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.8-slim
+
+# Configurar locale UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV PYTHONIOENCODING=UTF-8
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        bash \
+        locales && \
+    locale-gen en_US.UTF-8 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /badgr_server
+WORKDIR /badgr_server
+
+# Install only runtime dependencies
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        libcairo2 \
+        libmariadb3 \
+        xmlsec1 \
+        libjpeg62-turbo \
+        nano \
+        curl \
+        netcat-openbsd && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy from builder stage
+COPY --from=builder /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application files
+COPY manage.py /badgr_server
+COPY .docker/etc/uwsgi.ini /badgr_server
+COPY .docker/etc/wsgi.py /badgr_server/wsgi.py
+COPY apps /badgr_server/apps
+COPY .docker/etc/settings_local.prod.py /badgr_server/apps/mainsite/settings_local.py
+COPY .docker/init/init_django.sh /badgr_server/init_django.sh
+
+RUN chmod +x /badgr_server/init_django.sh
+
+EXPOSE 8911
+CMD ["/bin/bash", "-c", "./init_django.sh && uwsgi --ini uwsgi.ini"]
