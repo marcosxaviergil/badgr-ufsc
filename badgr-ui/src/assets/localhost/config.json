@@ -1,0 +1,11 @@
+{
+	"apiUrl": "https://api-badges.setic.ufsc.br",
+	"api": {
+		"baseUrl": "https://api-badges.setic.ufsc.br"
+	},
+	"theme": {
+		"termsOfServiceLink": null,
+		"termsHelpLink": null,
+		"privacyPolicyLink": null
+	}
+}
