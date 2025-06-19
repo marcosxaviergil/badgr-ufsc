@@ -1,0 +1,57 @@
+# .gitlab-ci.yml
+
+image: registry.setic.ufsc.br/marcosxavier/docker-image/docker:stable
+
+stages:
+  - build
+ # - portainer
+  - cleanup
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+
+before_script:
+  - docker info
+
+build-server:
+  stage: build
+  only:
+    - master
+  script:
+    - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - docker build --pull -f .docker/Dockerfile.prod.api -t "$CI_REGISTRY_IMAGE/server:$CI_COMMIT_REF_NAME" .
+    - docker push "$CI_REGISTRY_IMAGE/server:$CI_COMMIT_REF_NAME"
+  tags:
+    - docker
+
+build-ui:
+  stage: build
+  only:
+    - master
+  script:
+    - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - docker build --pull -f badgr-ui/Dockerfile -t "$CI_REGISTRY_IMAGE/ui:$CI_COMMIT_REF_NAME" .
+    - docker push "$CI_REGISTRY_IMAGE/ui:$CI_COMMIT_REF_NAME"
+  tags:
+    - docker
+
+#portainer:
+#  stage: portainer
+#  variables:
+#    GIT_CHECKOUT: "false"
+#  script:
+#    - |
+#      for url in $(echo "${WEBHOOK_PORTAINER}" | tr ',' ' '); do
+#        wget --quiet --post-data '' -O - "$url"
+#      done
+
+cleanup:
+  stage: cleanup
+  only:
+    - master
+  script:
+    - echo "🧹 Limpeza geral do Docker..."
+    - docker system prune -af
+  tags:
+    - docker

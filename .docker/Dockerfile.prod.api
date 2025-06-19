@@ -1,0 +1,105 @@
+# Stage 1: Build dependencies
+FROM python:3.8-slim as builder
+
+# Configurar locale UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV PYTHONIOENCODING=UTF-8
+
+WORKDIR /build
+
+# ✅ ESPECÍFICO: Dependências de build para SEU requirements.txt
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential \
+        default-libmysqlclient-dev \
+        libjpeg-dev \
+        zlib1g-dev \
+        libfreetype6-dev \
+        libffi-dev \
+        libcairo2-dev \
+        libxml2-dev \
+        libxslt1-dev \
+        libssl-dev \
+        python3-dev \
+        locales \
+        pkg-config && \
+    locale-gen en_US.UTF-8 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Stage 2: Runtime (CORRIGIDO)
+FROM python:3.8-slim
+
+# Configurar locale UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV PYTHONIOENCODING=UTF-8
+
+# ✅ CORREÇÃO: Adicionar TODAS as bibliotecas de runtime necessárias
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        bash \
+        locales \
+        # ✅ Para mysqlclient==1.4.6
+        libmariadb3 \
+        # ✅ Para Pillow==6.2.0
+        libjpeg62-turbo \
+        libfreetype6 \
+        libpng16-16 \
+        # ✅ Para CairoSVG==1.0.22 e cairocffi==0.9.0
+        libcairo2 \
+        libcairo-gobject2 \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libgdk-pixbuf-2.0-0 \
+        # ✅ Para uwsgi==2.0.21
+        libpcre3 \
+        libyaml-0-2 \
+        libjansson4 \
+        # ✅ Para pysaml2==5.0.0
+        xmlsec1 \
+        libxml2 \
+        libxslt1.1 \
+        libxmlsec1 \
+        libxmlsec1-openssl \
+        # ✅ Para cryptography==2.3
+        libssl3 \
+        libffi8 \
+        # ✅ Para operações gerais
+        nano \
+        curl \
+        netcat-openbsd && \
+    locale-gen en_US.UTF-8 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir /badgr_server
+
+WORKDIR /badgr_server
+
+# Copy from builder stage
+COPY --from=builder /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application files
+COPY manage.py /badgr_server/
+COPY .docker/etc/uwsgi.ini /badgr_server/
+COPY .docker/etc/wsgi.py /badgr_server/wsgi.py
+COPY apps /badgr_server/apps/
+COPY .docker/etc/settings_local.prod.py /badgr_server/apps/mainsite/settings_local.py
+COPY .docker/init/init_django.sh /badgr_server/init_django.sh
+
+# ✅ TESTE CORRIGIDO: Verificar se todas as bibliotecas funcionam
+RUN chmod +x /badgr_server/init_django.sh && \
+    echo "🧪 Testando bibliotecas essenciais..." && \
+    python3 -c "import mysqlclient; print('✅ mysqlclient OK')" && \
+    python3 -c "import PIL; print('✅ Pillow OK')" && \
+    python3 -c "import cairocffi; print('✅ cairocffi OK')" && \
+    python3 -c "import uwsgi; print('✅ uWSGI OK')" && \
+    echo "🎉 Todas as bibliotecas funcionam corretamente!"
+
+EXPOSE 8911
+CMD ["/bin/bash", "-c", "./init_django.sh && uwsgi --ini uwsgi.ini"]
