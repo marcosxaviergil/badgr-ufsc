@@ -1,5 +1,3 @@
-# apps/badgeuser/v1_api_urls.py
-
 from django.conf.urls import url
 
 from badgeuser.api import BadgeUserToken, BadgeUserForgotPassword, BadgeUserEmailConfirm, BadgeUserDetail

@@ -1,4 +1,3 @@
-# apps/issuer/tasks.py
 # encoding: utf-8
 
 
@@ -23,40 +22,33 @@ background_task_queue_name = getattr(settings, 'BACKGROUND_TASK_QUEUE_NAME', 'de
 badgerank_task_queue_name = getattr(settings, 'BADGERANK_TASK_QUEUE_NAME', 'default')
 
 
-@app.task(bind=True, queue=badgerank_task_queue_name, max_retries=0)
+@app.task(bind=True, queue=badgerank_task_queue_name, autoretry_for=(ConnectionError,), retry_backoff=True, max_retries=10)
 def notify_badgerank_of_badgeclass(self, badgeclass_pk):
-    """
-    ✅ DESABILITADO: BadgeRank não existe mais
-    Esta função foi mantida para compatibilidade mas está desabilitada por padrão
-    """
-    badgerank_enabled = getattr(settings, 'BADGERANK_NOTIFY_ENABLED', False)  # ✅ Padrão False
+    badgerank_enabled = getattr(settings, 'BADGERANK_NOTIFY_ENABLED', True)
     if not badgerank_enabled:
         return {
             'success': True,
-            'message': "BadgeRank notification disabled (service no longer exists)"
+            'message': "skipping since BADGERANK_NOTIFY_ENABLED=False"
         }
 
-    # ✅ Código original comentado para evitar erros
-    # try:
-    #     badgeclass = BadgeClass.cached.get(pk=badgeclass_pk)
-    # except BadgeClass.DoesNotExist:
-    #     return {
-    #         'success': False,
-    #         'error': "Unknown badgeclass pk={}".format(badgeclass_pk)
-    #     }
+    try:
+        badgeclass = BadgeClass.cached.get(pk=badgeclass_pk)
+    except BadgeClass.DoesNotExist:
+        return {
+            'success': False,
+            'error': "Unknown badgeclass pk={}".format(badgeclass_pk)
+        }
 
-    # badgerank_notify_url = getattr(settings, 'BADGERANK_NOTIFY_URL', 'https://api.badgerank.org/v1/badgeclass/submit')
-    # response = requests.post(badgerank_notify_url, json=dict(url=badgeclass.public_url))
-    # if response.status_code != 200:
-    #     return {
-    #         'success': False,
-    #         'status_code': response.status_code,
-    #         'response': response.content
-    #     }
-    
+    badgerank_notify_url = getattr(settings, 'BADGERANK_NOTIFY_URL', 'https://api.badgerank.org/v1/badgeclass/submit')
+    response = requests.post(badgerank_notify_url, json=dict(url=badgeclass.public_url))
+    if response.status_code != 200:
+        return {
+            'success': False,
+            'status_code': response.status_code,
+            'response': response.content
+        }
     return {
-        'success': True,
-        'message': "BadgeRank service no longer available"
+        'success': True
     }
 
 

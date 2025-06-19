@@ -1,7 +1,7 @@
 # apps/badgrsocialauth/adapter.py
 
 import logging
-import urllib.parse  # ✅ CORREÇÃO: Importação correta para Python 3
+import urllib.request, urllib.parse, urllib.error
 
 from allauth.account.utils import user_email
 from allauth.exceptions import ImmediateHttpResponse
@@ -26,7 +26,7 @@ class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
                 'exception': exception,
                 'extra_context': extra_context,
             })
-        badgr_app = BadgrApp.objects.get_current(request)
+        badgr_app = BadgrApp.objects.get_current(self.request)
         redirect_url = "{url}?authError={message}".format(
             url=badgr_app.ui_login_redirect,
             message=urllib.parse.quote("Authentication error"))
@@ -67,7 +67,7 @@ class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
 
     def pre_social_login(self, request, sociallogin):
         """
-        Retrieve and verify (again) auth token that was provided with initial connect request. Store as request.user,
+        Retrieve and verify (again) auth token that was provided with initial connect request.  Store as request.user,
         as required for socialauth connect logic.
         """
         self._update_session(request, sociallogin)
@@ -80,7 +80,7 @@ class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
 
                 request.user = accesstoken.user
                 if sociallogin.is_existing and accesstoken.user != sociallogin.user:
-                    badgr_app = BadgrApp.objects.get_current(request)
+                    badgr_app = BadgrApp.objects.get_current(self.request)
                     redirect_url = "{url}?authError={message}".format(
                         url=badgr_app.ui_connect_success_redirect,
                         message=urllib.parse.quote("Could not add social login. This account is already associated with a user."))
@@ -88,21 +88,3 @@ class BadgrSocialAccountAdapter(DefaultSocialAccountAdapter):
 
         except AuthenticationFailed as e:
             raise ImmediateHttpResponse(HttpResponseForbidden(e.detail))
-
-    def get_email_confirmation_redirect_url(self, request):
-        """
-        ✅ CORREÇÃO PARA DJANGO-ALLAUTH 0.39.1
-        Redirecionamento após confirmação de e-mail compatível com versões antigas.
-        """
-        badgr_app = BadgrApp.objects.get_current(request)
-        ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-        
-        # Garantir formato correto da URL (Django 1.11 compatible)
-        if not ui_url.startswith('http'):
-            ui_url = 'https://' + ui_url
-        
-        email = request.user.email if request.user and request.user.email else ''
-        return "{}/auth/welcome?email={}&signup=true".format(
-            ui_url.rstrip('/'),
-            urllib.parse.quote(email)
-        )

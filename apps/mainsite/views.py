@@ -2,15 +2,15 @@
 
 import base64
 import time
-import json
 
 from django import forms
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+# from django.core.urlresolvers import reverse_lazy <--- comentado em favor da linha de baixo
 from django.core.urlresolvers import reverse_lazy
 from django.db import IntegrityError
 from django.http import (HttpResponse, HttpResponseServerError,
-                         HttpResponseNotFound, HttpResponseRedirect, JsonResponse)
+                         HttpResponseNotFound, HttpResponseRedirect)
 from django.shortcuts import redirect
 from django.template import loader, TemplateDoesNotExist
 from django.utils.decorators import method_decorator
@@ -59,18 +59,7 @@ def error500(request):
 
 
 def info_view(request):
-    """
-    ✅ CORRIGIDO: Retorna JSON em vez de redirect para evitar 302
-    """
-    return JsonResponse({
-        'status': 'ok',
-        'service': 'Badgr API',
-        'version': '2.0',
-        'timestamp': time.time(),
-        'oauth_login': '/accounts/ufsc/login/',
-        'documentation': '/docs/',
-        'health': '/api/health'
-    })
+    return redirect(getattr(settings, 'LOGIN_REDIRECT_URL'))
 
 
 def email_unsubscribe_response(request, message, error=False):
@@ -203,66 +192,56 @@ class DocsAuthorizeRedirect(RedirectView):
             url = "{}?{}".format(url, query)
         return url
 
-
-# ✅ ENDPOINT CORRIGIDO PARA TOKEN LOGIN
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from oauth2_provider.models import Application, AccessToken
-
+import json
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def token_login(request):
     """Endpoint para login que retorna token OAuth2 diretamente"""
+    username = request.data.get('username')
+    password = request.data.get('password')
+    
+    # Autenticar usuário
+    user = authenticate(username=username, password=password)
+    if not user:
+        return Response({'error': 'Invalid credentials'}, status=400)
+    
+    # Buscar application "public"
     try:
-        username = request.data.get('username')
-        password = request.data.get('password')
-        
-        if not username or not password:
-            return Response({'error': 'Username and password required'}, status=400)
-        
-        # Autenticar usuário
-        user = authenticate(username=username, password=password)
-        if not user:
-            return Response({'error': 'Invalid credentials'}, status=400)
-        
-        # Buscar application "public"
-        try:
-            application = Application.objects.get(client_id='public')
-        except Application.DoesNotExist:
-            return Response({'error': 'OAuth2 not configured'}, status=500)
-        
-        # Limpar tokens antigos do usuário (opcional)
-        AccessToken.objects.filter(user=user, application=application).delete()
-        
-        # Criar token
-        import uuid
-        from datetime import timedelta
-        from django.utils import timezone
-        
-        token = AccessToken.objects.create(
-            user=user,
-            application=application,
-            token=uuid.uuid4().hex,
-            expires=timezone.now() + timedelta(seconds=86400),  # 24 horas
-            scope='rw:profile rw:issuer rw:backpack'
-        )
-        
-        return Response({
-            'access_token': token.token,
-            'token_type': 'Bearer',
-            'expires_in': 86400,
-            'scope': token.scope,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Token login error: {str(e)}")
-        return Response({'error': 'Internal server error'}, status=500)
+        application = Application.objects.get(client_id='public')
+    except Application.DoesNotExist:
+        return Response({'error': 'OAuth2 not configured'}, status=500)
+    
+    # Limpar tokens antigos do usuário (opcional)
+    AccessToken.objects.filter(user=user, application=application).delete()
+    
+    # Criar token (versão corrigida para django-oauth-toolkit 1.1.2)
+    import uuid
+    from datetime import datetime, timedelta
+    from django.utils import timezone
+    
+    token = AccessToken.objects.create(
+        user=user,
+        application=application,
+        token=uuid.uuid4().hex,  # ✅ CORRIGIDO: Gerar token manualmente
+        expires=timezone.now() + timedelta(seconds=86400),  # 24 horas
+        scope='rw:profile rw:issuer rw:backpack'
+    )
+    
+    return Response({
+        'access_token': token.token,
+        'token_type': 'Bearer',
+        'expires_in': 86400,
+        'scope': token.scope,
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+        }
+    })

@@ -3,28 +3,27 @@
 import os
 import sys
 
-# Configurar encoding UTF-8 antes de qualquer import Django
-os.environ.setdefault('LANG', 'C.UTF-8')
-os.environ.setdefault('LC_ALL', 'C.UTF-8')
-os.environ.setdefault('PYTHONIOENCODING', 'UTF-8')
+# assume we(this file) have a parent that is a sibling to the CODE_DIR
+OUR_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# Configurar locale de forma compatível com versões antigas
-try:
-    import locale
-    locale.setlocale(locale.LC_ALL, 'C.UTF-8')
-except:
-    # Fallback silencioso se locale não disponível
-    try:
-        import locale
-        locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-    except:
-        pass
+# code dir is one level above us
+APPS_DIR = os.path.join(OUR_DIR, '..', 'code', 'apps')
 
-# Adiciona o diretório de apps ao Python path (compatível com Docker)
-sys.path.insert(0, '/badgr_server/apps')
+# the env dir is one level above us
+ENV_DIR = os.path.join(OUR_DIR, '..', 'env')
 
+# activate the virtualenv
+activate_this = os.path.join(ENV_DIR, 'bin', 'activate_this.py')
+exec(compile(open(activate_this, "rb").read(), activate_this, 'exec'), dict(__file__=activate_this))
+
+# add the apps directory to the python path
+sys.path.insert(0, APPS_DIR)
+
+# load up django
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mainsite.settings_local")
+# tell django to find settings entry point'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'mainsite.settings_local'
 
+# hand off to the wsgi application
 application = get_wsgi_application()

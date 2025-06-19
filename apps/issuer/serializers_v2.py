@@ -1,5 +1,3 @@
-#apps/issuer/serializers_v2.py
-
 from collections import OrderedDict
 import os
 import pytz

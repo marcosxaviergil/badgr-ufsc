@@ -1,4 +1,3 @@
-# apps/mainsite/managers.py
 # Created by wiggins@concentricsky.com on 4/18/16.
 import cachemodel
 from django.conf import settings

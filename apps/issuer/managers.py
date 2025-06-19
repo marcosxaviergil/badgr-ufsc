@@ -1,4 +1,3 @@
-# apps/issuer/managers.py
 # encoding: utf-8
 
 
@@ -102,11 +101,7 @@ class BadgeClassManager(BaseOpenBadgeObjectManager):
         obj = self.model(**kwargs)
         obj.save()
 
-        # ✅ BADGERANK DESABILITADO: Verificar se notificação está habilitada
-        badgerank_create_enabled = getattr(settings, 'BADGERANK_NOTIFY_ON_BADGECLASS_CREATE', False)  # ✅ Padrão False
-        badgerank_enabled = getattr(settings, 'BADGERANK_NOTIFY_ENABLED', False)  # ✅ Padrão False
-        
-        if badgerank_create_enabled and badgerank_enabled:
+        if getattr(settings, 'BADGERANK_NOTIFY_ON_BADGECLASS_CREATE', True):
             from issuer.tasks import notify_badgerank_of_badgeclass
             notify_badgerank_of_badgeclass.delay(badgeclass_pk=obj.pk)
 
@@ -366,15 +361,9 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         if notify:
             new_instance.notify_earner(badgr_app=badgr_app)
 
-        # ✅ BADGERANK DESABILITADO: Verificar se notificação está habilitada
-        badgerank_create_disabled = not getattr(settings, 'BADGERANK_NOTIFY_ON_BADGECLASS_CREATE', False)  # ✅ Invertido: True se desabilitado
-        badgerank_first_enabled = getattr(settings, 'BADGERANK_NOTIFY_ON_FIRST_ASSERTION', False)  # ✅ Padrão False
-        badgerank_enabled = getattr(settings, 'BADGERANK_NOTIFY_ENABLED', False)  # ✅ Padrão False
-        
-        if (badgeclass.recipient_count() == 1 and 
-            badgerank_create_disabled and 
-            badgerank_first_enabled and 
-            badgerank_enabled):
+        if badgeclass.recipient_count() == 1 and (
+                not getattr(settings, 'BADGERANK_NOTIFY_ON_BADGECLASS_CREATE', True) and
+                getattr(settings, 'BADGERANK_NOTIFY_ON_FIRST_ASSERTION', True)):
             from issuer.tasks import notify_badgerank_of_badgeclass
             notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
 

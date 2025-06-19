@@ -1,169 +1,131 @@
-# apps/badgeuser/managers.py
+import json
+import random
+import string
 
-import cachemodel
-import logging
-from django.contrib.auth.models import BaseUserManager
+from allauth.account.managers import EmailAddressManager
+from allauth.account.adapter import get_adapter
+from django.contrib.auth.models import UserManager
+from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.urls import reverse
 
-logger = logging.getLogger(__name__)
+from badgeuser.authcode import encrypt_authcode
+from mainsite.models import BadgrApp
+from mainsite.utils import OriginSetting
+from mainsite.utils import set_url_query_params
 
 
-class BadgeUserManager(BaseUserManager, cachemodel.CacheModelManager):
-    """
-    Manager para BadgeUser com cache e funcionalidades de criação
-    """
-    
-    def create_user(self, email, password=None, send_confirmation=True, **extra_fields):
-        """
-        ✅ CORRIGIDO: Criar usuário com controle de confirmação de email
-        """
-        if not email:
-            raise ValueError('The Email field must be set')
-        
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        
-        if password:
-            user.set_password(password)
-        
-        user.save(using=self._db)
-        
-        logger.info("User %s created successfully", email)
+class BadgeUserManager(UserManager):
+    duplicate_email_error = 'Account could not be created. An account with this email address may already exist.'
+
+    def create(self,
+               email,
+               first_name,
+               last_name,
+               request=None,
+               plaintext_password=None,
+               send_confirmation=True,
+               create_email_address=True,
+               marketing_opt_in=False,
+               source=''
+               ):
+        from badgeuser.models import CachedEmailAddress, TermsVersion
+
+        user = None
+        badgrapp = BadgrApp.objects.get_current(request=request)
+
+        # Do we know about this email address yet?
+        try:
+            existing_email = CachedEmailAddress.cached.get(email=email)
+        except CachedEmailAddress.DoesNotExist:
+            # nope
+            pass
+        else:
+            if plaintext_password and not existing_email.user.password and not existing_email.verified:
+                # yes, it's owned by an auto-created user trying to set a password
+                user = existing_email.user
+            elif plaintext_password and not existing_email.user.password:
+                # yes, it's owned by an auto-created user trying to set a password,
+                # but email was marked verified to allow this user API access from other applications
+                # We shouldn't set any of the user attributes at this time until confirmation
+                user = existing_email.user
+                self.send_account_confirmation(
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    badgrapp_id=badgrapp.id,
+                    marketing_opt_in=marketing_opt_in,
+                    plaintext_password=plaintext_password,
+                    source=source
+                )
+                return self.model(email=email)
+            elif existing_email.verified:
+                raise ValidationError(self.duplicate_email_error)
+            else:
+                # yes, it's an unverified email address owned by a claimed user
+                # remove the email
+                existing_email.delete()
+                # if the user no longer has any emails, remove it
+                if len(existing_email.user.cached_emails()) == 0:
+                    existing_email.user.delete()
+
+        if user is None:
+            user = self.model(email=email)
+
+        user.first_name = first_name
+        user.last_name = last_name
+        user.badgrapp = badgrapp
+        user.marketing_opt_in = marketing_opt_in
+        user.agreed_terms_version = TermsVersion.cached.latest_version()
+        if plaintext_password:
+            user.set_password(plaintext_password)
+        user.save()
+
+        # create email address record as needed
+        if create_email_address:
+            CachedEmailAddress.objects.add_email(user, email, request=request, signup=True, confirm=send_confirmation)
         return user
 
-    def create_superuser(self, email, password, **extra_fields):
-        """
-        Criar superusuário
-        """
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
+    @staticmethod
+    def send_account_confirmation(**kwargs):
+        if not kwargs.get('email'):
+            return
 
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
+        email = kwargs['email']
+        source = kwargs['source']
+        expires_seconds = getattr(settings, 'AUTH_TIMEOUT_SECONDS', 7 * 86400)
+        payload = kwargs.copy()
+        payload['nonce'] = ''.join(random.choice(string.ascii_uppercase) for _ in range(random.randint(20, 30)))
+        payload = json.dumps(payload)
 
-        return self.create_user(email, password, send_confirmation=False, **extra_fields)
+        authcode = encrypt_authcode(payload, expires_seconds=expires_seconds)
+        confirmation_url = "{origin}{path}".format(
+            origin=OriginSetting.HTTP,
+            path=reverse('v2_api_account_confirm', kwargs=dict(authcode=authcode)),
+        )
+        if source:
+            confirmation_url = set_url_query_params(confirmation_url, source=source)
 
-    def get_by_email(self, email):
-        """
-        Buscar usuário por email
-        """
-        return self.get(email=email)
+        get_adapter().send_mail('account/email/email_confirmation_signup', email, {
+            'HTTP_ORIGIN': settings.HTTP_ORIGIN,
+            'STATIC_URL': settings.STATIC_URL,
+            'MEDIA_URL': settings.MEDIA_URL,
+            'activate_url': confirmation_url,
+            'email': email,
+        })
 
 
-class CachedEmailAddressManager(cachemodel.CacheModelManager):
-    """
-    Manager para CachedEmailAddress
-    """
-    
-    def get_users_by_email(self, email):
-        """
-        Retorna todos os usuários que têm o email especificado
-        """
-        email_addresses = self.filter(email=email)
-        return [e.user for e in email_addresses]
-    
-    def get_primary(self, user):
-        """
-        Retorna o email primário do usuário
-        """
+class CachedEmailAddressManager(EmailAddressManager):
+    def add_email(self, user, email, request=None, confirm=False, signup=False):
         try:
-            return self.get(user=user, primary=True)
+            email_address = self.get(user=user, email__iexact=email)
         except self.model.DoesNotExist:
-            return None
-    
-    def get_verified(self, user):
-        """
-        Retorna todos os emails verificados do usuário
-        """
-        return self.filter(user=user, verified=True)
-    
-    def add_email(self, user, email, request=None, confirm=False, signup=False, send_confirmation=None):
-        """
-        ✅ CORRIGIDO: Adicionar email sem enviar confirmação
-        """
-        # ✅ CORRIGIDO: Usar send_confirmation se fornecido, senão usar confirm
-        if send_confirmation is None:
-            send_confirmation = confirm
-            
-        try:
-            # Verifica se o email já existe para este usuário
-            email_address = self.get(user=user, email=email)
-            if email_address.verified:
-                logger.info("Email %s already verified for user %s", email, user.email)
-                return email_address
-        except self.model.DoesNotExist:
-            # Criar novo email address
-            is_primary = not self.filter(user=user).exists()
-            email_address = self.create(
-                user=user,
-                email=email,
-                verified=not send_confirmation,  # ✅ Se não enviar confirmação, marcar como verificado
-                primary=is_primary
-            )
-            logger.info("Email %s created for user %s", email, user.email)
+            email_address = self.create(user=user, email=email)
+        if confirm and not email_address.verified:
+            email_address.send_confirmation(request=request, signup=signup)
 
-        if send_confirmation:
-            logger.info("Email confirmation would be sent to %s", email)
-            # ✅ CORRIGIDO: Não enviar confirmação, apenas marcar como verificado
-            email_address.verified = True
-            email_address.save()
-            logger.info("Email %s marked as verified automatically", email)
-        
+        # Add variant if it does not exist
+        if email_address.email.lower() == email.lower() and email_address.email != email:
+            self.model.add_variant(email)
+
         return email_address
-    
-    def get_for_user(self, user):
-        """
-        Retorna todos os emails do usuário
-        """
-        return self.filter(user=user)
-    
-    def can_add_email(self, user):
-        """
-        Verifica se o usuário pode adicionar mais emails
-        """
-        from django.conf import settings
-        max_email_addresses = getattr(settings, 'ACCOUNT_MAX_EMAIL_ADDRESSES', None)
-        if max_email_addresses:
-            if self.filter(user=user).count() >= max_email_addresses:
-                return False
-        return True
-    
-    def fill_cache_for_user(self, user):
-        """
-        Pre-popular o cache para todos os emails do usuário
-        """
-        list(self.filter(user=user))
-    
-    def set_primary(self, user, email):
-        """
-        Definir email como primário
-        """
-        with transaction.atomic():
-            # Remover primary de todos os outros emails
-            self.filter(user=user, primary=True).update(primary=False)
-            
-            # Definir este email como primário
-            email_address = self.get(user=user, email=email)
-            email_address.primary = True
-            email_address.save()
-            
-            logger.info("Email %s set as primary for user %s", email, user.email)
-            return email_address
-    
-    def verify_email(self, user, email):
-        """
-        Marcar email como verificado
-        """
-        try:
-            email_address = self.get(user=user, email=email)
-            email_address.verified = True
-            email_address.save()
-            
-            logger.info("Email %s verified for user %s", email, user.email)
-            return email_address
-        except self.model.DoesNotExist:
-            logger.error("Email %s not found for user %s", email, user.email)
-            raise ValueError("Email address not found")

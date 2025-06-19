@@ -1,9 +1,7 @@
-# apps/badgeuser/api.py
-
 import datetime
 import json
 import re
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import urllib.parse
 
 from allauth.account.adapter import get_adapter
@@ -18,8 +16,8 @@ from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.urlresolvers import reverse  # Django 1.11 compatibility
-from django.http import Http404, HttpResponseRedirect
+from django.core.urlresolvers import reverse
+from django.http import Http404
 from django.utils import timezone
 from django.views.generic import RedirectView
 from rest_framework import permissions, serializers, status
@@ -365,7 +363,14 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
 
     def get(self, request, **kwargs):
         """
-        ✅ COMPATÍVEL COM DJANGO 1.11 E DJANGO-ALLAUTH 0.39.1
+        Confirm an email address with a token provided in an email
+        ---
+        parameters:
+            - name: token
+              type: string
+              paramType: form
+              description: The token received in the recovery email
+              required: true
         """
         token = request.query_params.get('token', '')
         badgrapp_id = request.query_params.get('a')
@@ -373,118 +378,92 @@ class BadgeUserEmailConfirm(BaseUserRecoveryView):
         # Get BadgrApp instance
         badgrapp = BadgrApp.objects.get_by_id_or_default(badgrapp_id)
 
-        # Get EmailConfirmation instance - compatível com django-allauth 0.39.1
+        # Get EmailConfirmation instance
         emailconfirmation = EmailConfirmationHMAC.from_key(kwargs.get('confirm_id'))
         if emailconfirmation is None:
-            ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-            error_url = "{}/auth/login?authError={}".format(
-                ui_url, 
-                urllib.parse.quote("Email confirmation link invalid")
-            )
-            return HttpResponseRedirect(error_url)
-
+            logger.event(badgrlog.NoEmailConfirmation())
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your email confirmation link is invalid. Please attempt to "
+                                                    "create an account with this email address, again.")  # 202
         # Get EmailAddress instance
-        try:
-            email_address = CachedEmailAddress.cached.get(pk=emailconfirmation.email_address.pk)
-        except CachedEmailAddress.DoesNotExist:
-            ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-            error_url = "{}/auth/login?authError={}".format(
-                ui_url, 
-                urllib.parse.quote("Email confirmation link invalid")
-            )
-            return HttpResponseRedirect(error_url)
+        else:
+            try:
+                email_address = CachedEmailAddress.cached.get(
+                    pk=emailconfirmation.email_address.pk)
+            except CachedEmailAddress.DoesNotExist:
+                logger.event(badgrlog.NoEmailConfirmationEmailAddress(
+                    request, email_address=emailconfirmation.email_address))
+                return redirect_to_frontend_error_toast(request,
+                                                        "Your email confirmation link is invalid. Please attempt "
+                                                        "to create an account with this email address, again.")  # 202
 
         if email_address.verified:
-            # Email já verificado
-            ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-            success_url = "{}/auth/welcome?email={}&emailConfirmed=true".format(
-                ui_url, 
-                urllib.parse.quote(email_address.email)
-            )
-            return HttpResponseRedirect(success_url)
+            logger.event(badgrlog.EmailConfirmationAlreadyVerified(
+                request, email_address=email_address, token=token))
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your email address is already verified. You may now log in.")
 
-        # Validate token syntax from query param
+        # Validate 'token' syntax from query param
         matches = re.search(r'([0-9A-Za-z]+)-(.*)', token)
         if not matches:
-            ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-            error_url = "{}/auth/login?authError={}".format(
-                ui_url, 
-                urllib.parse.quote("Invalid token")
-            )
-            return HttpResponseRedirect(error_url)
-
+            logger.event(badgrlog.InvalidEmailConfirmationToken(
+                request, token=token, email_address=email_address))
+            email_address.send_confirmation(request=request, signup=False)
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your email confirmation token is invalid. You have been sent "
+                                                    "a new link. Please check your email and try again.")  # 2
         uidb36 = matches.group(1)
         key = matches.group(2)
         if not (uidb36 and key):
-            ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-            error_url = "{}/auth/login?authError={}".format(
-                ui_url, 
-                urllib.parse.quote("Invalid token")
-            )
-            return HttpResponseRedirect(error_url)
+            logger.event(badgrlog.InvalidEmailConfirmationToken(
+                request, token=token, email_address=email_address))
+            email_address.send_confirmation(request=request, signup=False)
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your email confirmation token is invalid. You have been sent "
+                                                    "a new link. Please check your email and try again.")  # 2
 
         # Get User instance from literal 'token' value
         user = self._get_user(uidb36)
         if user is None or not default_token_generator.check_token(user, key):
-            ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-            error_url = "{}/auth/login?authError={}".format(
-                ui_url, 
-                urllib.parse.quote("Token expired")
-            )
-            return HttpResponseRedirect(error_url)
+            logger.event(badgrlog.EmailConfirmationTokenExpired(
+                request, email_address=email_address))
+            email_address.send_confirmation(request=request, signup=False)
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your authorization link has expired. You have been sent a new "
+                                                    "link. Please check your email and try again.")
 
         if email_address.user != user:
-            ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-            error_url = "{}/auth/login?authError={}".format(
-                ui_url, 
-                urllib.parse.quote("Token mismatch")
-            )
-            return HttpResponseRedirect(error_url)
+            logger.event(badgrlog.OtherUsersEmailConfirmationToken(
+                request, email_address=email_address, token=token, other_user=user))
+            return redirect_to_frontend_error_toast(request,
+                                                    "Your email confirmation token is associated with an unexpected "
+                                                    "user. You may try again")
 
-        # ✅ SUCESSO: Perform main operation
+        # Perform main operation, set EmaiAddress .verified and .primary True
         old_primary = CachedEmailAddress.objects.get_primary(user)
         if old_primary is None:
             email_address.primary = True
         email_address.verified = True
         email_address.save()
 
-        # Process email verification in background (Django 1.11 compatible)
-        try:
-            process_email_verification.delay(email_address.pk)
-        except Exception:
-            pass  # Ignore celery errors in case it's not configured
+        process_email_verification.delay(email_address.pk)
 
-        # ✅ Create OAuth token and redirect (compatible with django-oauth-toolkit 1.1.2)
-        ui_url = getattr(settings, 'UI_URL', 'https://badges.setic.ufsc.br')
-        
-        try:
-            # Create an OAuth AccessTokenProxy instance for this user
-            accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
-                user,
-                application=badgrapp.oauth_application if badgrapp.oauth_application_id else None,
-                scope='rw:backpack rw:profile rw:issuer')
+        # Create an OAuth AccessTokenProxy instance for this user
+        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+            user,
+            application=badgrapp.oauth_application if badgrapp.oauth_application_id else None,
+            scope='rw:backpack rw:profile rw:issuer')
 
-            # Build success redirect URL (Django 1.11 compatible)
-            success_url = "{}/auth/welcome?email={}&signup=true".format(
-                ui_url, 
-                urllib.parse.quote(email_address.email)
-            )
+        redirect_url = get_adapter().get_email_confirmation_redirect_url(
+            request, badgr_app=badgrapp)
 
-            # Add auth code or token
-            if badgrapp.use_auth_code_exchange:
-                authcode = authcode_for_accesstoken(accesstoken)
-                success_url = set_url_query_params(success_url, authCode=authcode)
-            else:
-                success_url = set_url_query_params(success_url, authToken=accesstoken.token)
+        if badgrapp.use_auth_code_exchange:
+            authcode = authcode_for_accesstoken(accesstoken)
+            redirect_url = set_url_query_params(redirect_url, authCode=authcode)
+        else:
+            redirect_url = set_url_query_params(redirect_url, authToken=accesstoken.token)
 
-        except Exception:
-            # Fallback: redirect without token
-            success_url = "{}/auth/welcome?email={}&signup=true".format(
-                ui_url, 
-                urllib.parse.quote(email_address.email)
-            )
-
-        return HttpResponseRedirect(success_url)
+        return Response(status=HTTP_302_FOUND, headers={'Location': redirect_url})
 
 
 class BadgeUserAccountConfirm(RedirectView):
@@ -531,7 +510,6 @@ class BadgeUserAccountConfirm(RedirectView):
             user.set_password(user_info['plaintext_password'])
         user.save()
 
-        # Django 1.11 compatible urljoin
         redirect_url = urllib.parse.urljoin(
             self.badgrapp.email_confirmation_redirect.rstrip('/') + '/',
             urllib.parse.quote(user.first_name.encode('utf8'))

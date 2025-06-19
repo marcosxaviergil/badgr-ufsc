@@ -1,5 +1,3 @@
-# apps/issuer/api.py
-
 from collections import OrderedDict
 
 import datetime
@@ -248,19 +246,11 @@ class BadgeClassDetail(BaseEntityDetailView):
     )
     def put(self, request, **kwargs):
         response = super(BadgeClassDetail, self).put(request, **kwargs)
-        
-        # ======= REMOVIDO: CODIGO DO BADGERANK QUE CAUSAVA ERRO =======
-        # Comentado pois badgerank.org não existe mais e causava:
-        # ConnectionError: HTTPSConnectionPool(host='api.badgerank.org', port=443): Max retries exceeded
-        # 
-        # Codigo original removido:
-        # if response.status_code == 200 and getattr(settings, 'BADGERANK_NOTIFY_ON_FIRST_ASSERTION', True):
-        #     badgeclass = self.get_object(request, **kwargs)
-        #     if badgeclass.recipient_count() > 0:
-        #         from issuer.tasks import notify_badgerank_of_badgeclass
-        #         notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
-        # ===============================================================
-        
+        if response.status_code == 200 and getattr(settings, 'BADGERANK_NOTIFY_ON_FIRST_ASSERTION', True):
+            badgeclass = self.get_object(request, **kwargs)
+            if badgeclass.recipient_count() > 0:
+                from issuer.tasks import notify_badgerank_of_badgeclass
+                notify_badgerank_of_badgeclass.delay(badgeclass_pk=badgeclass.pk)
         return response
 
 

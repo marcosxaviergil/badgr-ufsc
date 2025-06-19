@@ -57,7 +57,7 @@ MIDDLEWARE_CLASSES = [
 ]
 
 ROOT_URLCONF = 'mainsite.urls'
-ALLOWED_HOSTS = ['api-badges.setic.ufsc.br', 'badges.setic.ufsc.br', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['api-badges.setic.ufsc.br', 'badges.setic.ufsc.br', 'localhost']
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 TEMPLATES = [
@@ -113,7 +113,7 @@ ACCOUNT_EMAIL_VERIFICATION = 'none'
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-ACCOUNT_CONFIRM_EMAIL_ON_GET = False
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
 ACCOUNT_LOGOUT_ON_GET = True
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_FORMS = {
@@ -121,13 +121,8 @@ ACCOUNT_FORMS = {
 }
 ACCOUNT_SIGNUP_FORM_CLASS = 'badgeuser.forms.BadgeUserCreationForm'
 
-# ✅ CONFIGURAÇÕES OAUTH UFSC - SEM DUPLICAÇÕES
 SOCIALACCOUNT_EMAIL_REQUIRED = False
 SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
-SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_QUERY_EMAIL = True
-SOCIALACCOUNT_STORE_TOKENS = True
-SOCIALACCOUNT_LOGIN_ON_GET = True
 
 SOCIALACCOUNT_PROVIDERS = {
     'azure': {
@@ -138,8 +133,8 @@ SOCIALACCOUNT_PROVIDERS = {
     },
     'ufsc': {
         'APP': {
-            'client_id': os.environ.get('UFSC_OAUTH2_CLIENT_ID', 'edx-badges'),
-            'secret': os.environ.get('UFSC_OAUTH2_CLIENT_SECRET', 'sdf46sdfgsddfg'),
+            'client_id': 'edx-badges',
+            'secret': 'sdf46sdfgsddfg',
             'key': ''
         },
         'SCOPE': ['openid', 'profile', 'email'],
@@ -159,6 +154,12 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
+#CORS_ALLOWED_ORIGINS = [
+#    'https://badges.setic.ufsc.br',
+#    'https://api-badges.setic.ufsc.br',
+#    'http://localhost:4200',
+#    'http://localhost:8080',
+#]
 CORS_URLS_REGEX = r'^.*$'
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
@@ -187,6 +188,48 @@ MEDIA_URL = '/media/'
 ADMIN_MEDIA_PREFIX = STATIC_URL+'admin/'
 
 FIXTURE_DIRS = [os.path.join(TOP_DIR, 'etc', 'fixtures')]
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'mail_admins': {
+            'level': 'ERROR',
+            'filters': [],
+            'class': 'django.utils.log.AdminEmailHandler'
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+        },
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['mail_admins', 'console'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+        'Badgr.Events': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'corsheaders': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        }
+    },
+    'formatters': {
+        'default': {'format': '%(asctime)s %(levelname)s %(module)s %(message)s'},
+        'json': {
+            '()': 'mainsite.formatters.JsonFormatter',
+            'format': '%(asctime)s',
+            'datefmt': '%Y-%m-%dT%H:%M:%S%z',
+        }
+    },
+}
 
 CACHES = {
     'default': {
@@ -263,130 +306,70 @@ BADGR_PUBLIC_BOT_USERAGENTS = ['LinkedInBot', 'Twitterbot', 'facebook', 'Facebot
 BADGR_PUBLIC_BOT_USERAGENTS_WIDE = ['LinkedInBot', 'Twitterbot', 'facebook', 'Facebot']
 
 CELERY_ALWAYS_EAGER = True
-
-# ✅ BADGERANK DESABILITADO
-BADGERANK_NOTIFY_ON_BADGECLASS_CREATE = False
-BADGERANK_NOTIFY_ON_FIRST_ASSERTION = False
-BADGERANK_NOTIFY_ENABLED = False
-BADGERANK_NOTIFY_URL = None
-
+BADGERANK_NOTIFY_ON_BADGECLASS_CREATE = True
+BADGERANK_NOTIFY_ON_FIRST_ASSERTION = True
+BADGERANK_NOTIFY_URL = 'https://api.badgerank.org/v1/badgeclass/submit'
 BADGR_APPROVED_ISSUERS_ONLY = False
 
-# ✅ DESABILITAR TERMS OF SERVICE
+# ========== DESABILITAR SISTEMA DE TERMS OF SERVICE COMPLETAMENTE ==========
+# Forca desabilitacao total do sistema de termos identificado na investigacao
+
+# Desabilitar GDPR compliance que forca termos
 GDPR_COMPLIANCE_NOTIFY_ON_FIRST_AWARD = False
+
+# Garantir que URLs de termos sejam None
 PRIVACY_POLICY_URL = None
 TERMS_OF_SERVICE_URL = None
 GDPR_INFO_URL = None
 OPERATOR_STREET_ADDRESS = None
 OPERATOR_NAME = None
 OPERATOR_URL = None
+
+# Desabilitar verificacao de termos no backend
 BADGR_TERMS_VERSION = None
 BADGR_PRIVACY_VERSION = None
+
+# Configuracoes do AllAuth para nao forcar termos
 ACCOUNT_EMAIL_CONFIRMATION_ANONYMOUS_REDIRECT_URL = None
 ACCOUNT_EMAIL_CONFIRMATION_AUTHENTICATED_REDIRECT_URL = None
+
+# Configuracao para frontend nao exibir popup de termos
 UI_DISABLE_TERMS_POPUP = True
 SHOW_TERMS_POPUP = False
 REQUIRE_TERMS_ACCEPTANCE = False
 
-# ✅ AUTHCODE_SECRET_KEY
+# Desabilitar middleware que pode forcar termos (se existir)
+MIDDLEWARE_CLASSES = [m for m in MIDDLEWARE_CLASSES if 'terms' not in m.lower()]
+
+# ===== AUTHCODE_SECRET_KEY CORRECTION =====
+# Corrigir problema de chave invalida que estava causando erro 500
 from cryptography.fernet import Fernet
 
+# Tentar pegar da variavel de ambiente primeiro
 AUTHCODE_SECRET_KEY = os.environ.get('AUTHCODE_SECRET_KEY')
 
 if not AUTHCODE_SECRET_KEY:
+    # Se nao esta definida na env, usar uma chave fixa valida para desenvolvimento
+    # EM PRODUCAO: sempre definir AUTHCODE_SECRET_KEY no docker-compose.yml
     AUTHCODE_SECRET_KEY = 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM92s='
+    print("WARNING: Usando AUTHCODE_SECRET_KEY padrao - defina no docker-compose.yml para producao")
 
+# Converter para bytes se necessario
 if isinstance(AUTHCODE_SECRET_KEY, str):
     AUTHCODE_SECRET_KEY = AUTHCODE_SECRET_KEY.encode('utf-8')
 
+# Verificar se a chave e valida
 try:
     Fernet(AUTHCODE_SECRET_KEY)
+    print("[OK] AUTHCODE_SECRET_KEY valida")
 except Exception as e:
+    print("[ERRO] AUTHCODE_SECRET_KEY invalida: {}".format(e))
+    # Gerar uma nova como fallback
     AUTHCODE_SECRET_KEY = Fernet.generate_key()
+    print("[INFO] Gerando nova chave: {}".format(AUTHCODE_SECRET_KEY.decode()))
 
 AUTHCODE_EXPIRES_SECONDS = 600
 
 SAML_EMAIL_KEYS = ['Email', 'mail']
 SAML_FIRST_NAME_KEYS = ['FirstName', 'givenName']
 SAML_LAST_NAME_KEYS = ['LastName', 'sn']
-
-# ✅ CONFIGURAÇÕES OAUTH UFSC
-UI_URL = os.environ.get('UI_URL', 'https://badges.setic.ufsc.br')
-
-# ✅ EMAIL SEM VALIDAÇÃO
-REGISTRATION_EMAIL_PATTERNS_ALLOWED = None
-REGISTRATION_EMAIL_PATTERNS_BLOCKED = None
-
-# ✅ CONFIGURAÇÕES PARA PROVIDERS OAUTH
-SOCIALACCOUNT_RECIPIENT_ID_PROVIDERS = ['twitter', 'ufsc']
-
-# ✅ ALLAUTH CONFIGURAÇÕES
-ACCOUNT_EMAIL_CONFIRMATION_HMAC = True
-ACCOUNT_EMAIL_CONFIRMATION_COOLDOWN = 180
-
-# ✅ CONFIGURAÇÃO DE EMAIL - CORRIGIDA PARA FUNCIONAR
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'noreply@badges.setic.ufsc.br'
-SERVER_EMAIL = 'noreply@badges.setic.ufsc.br'
-
-# ✅ DESABILITAR ENVIO DE EMAILS AUTOMÁTICOS
-SEND_WELCOME_EMAIL = False
-BADGR_SEND_CONFIRMATION_EMAILS = False
-
-# ✅ CONFIGURAÇÃO PARA PERMITIR CRIAÇÃO DE USUÁRIOS SEM VERIFICAÇÃO
-OPEN_FOR_SIGNUP = True
-ACCOUNT_EMAIL_VERIFICATION = 'none'
-SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
-
-# ✅ CONFIGURAÇÃO DE LOGGING - SIMPLIFICADA
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'default': {
-            'format': '%(asctime)s %(levelname)s %(module)s %(message)s'
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'default',
-        },
-        'null': {
-            'class': 'logging.NullHandler',
-        },
-    },
-    'loggers': {
-        'django.request': {
-            'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-        'mainsite.settings': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'badgrsocialauth': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        # ✅ SILENCIAR LOGS PROBLEMÁTICOS
-        'issuer.tasks': {
-            'handlers': ['null'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'celery.task': {
-            'handlers': ['null'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'WARNING',
-    },
-}

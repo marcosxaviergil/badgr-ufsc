@@ -9,8 +9,7 @@ from allauth.socialaccount.providers.oauth2.views import (
 )
 from .provider import UfscProvider
 
-# ✅ CORREÇÃO: Logger específico para evitar problemas
-logger = logging.getLogger('badgrsocialauth.ufsc.views')
+logger = logging.getLogger(__name__)
 
 
 class UfscOAuth2Adapter(OAuth2Adapter):
@@ -23,7 +22,7 @@ class UfscOAuth2Adapter(OAuth2Adapter):
         """Completa o login obtendo dados do usuário"""
         headers = {'Authorization': 'Bearer {0}'.format(token.token)}
         
-        logger.info("UFSC OAuth: Buscando perfil do usuario")
+        logger.info("UFSC OAuth: Buscando perfil do usuário")
         
         try:
             resp = requests.get(self.profile_url, headers=headers, timeout=30)
@@ -31,17 +30,17 @@ class UfscOAuth2Adapter(OAuth2Adapter):
             extra_data = resp.json()
             
             logger.info("UFSC OAuth: Dados recebidos com sucesso")
-            logger.debug("UFSC OAuth: Dados do usuario: %s", extra_data)
+            logger.debug("UFSC OAuth: Dados do usuário: %s", extra_data)
             
         except requests.RequestException as e:
             logger.error("UFSC OAuth: Erro ao buscar perfil: %s", str(e))
-            # Fallback com dados padrão
+            # Fallback para dados básicos se a requisição falhar
             extra_data = {
                 'id': 'ufsc_user',
                 'attributes': {
                     'login': 'ufsc_user',
                     'email': 'usuario@ufsc.br',
-                    'nomeSocial': 'Usuario UFSC'
+                    'nomeSocial': 'Usuário UFSC'
                 }
             }
         except ValueError as e:
@@ -51,17 +50,7 @@ class UfscOAuth2Adapter(OAuth2Adapter):
                 'attributes': {
                     'login': 'ufsc_user',
                     'email': 'usuario@ufsc.br',
-                    'nomeSocial': 'Usuario UFSC'
-                }
-            }
-        except Exception as e:
-            logger.error("UFSC OAuth: Erro inesperado: %s", str(e))
-            extra_data = {
-                'id': 'ufsc_user',
-                'attributes': {
-                    'login': 'ufsc_user',
-                    'email': 'usuario@ufsc.br',
-                    'nomeSocial': 'Usuario UFSC'
+                    'nomeSocial': 'Usuário UFSC'
                 }
             }
         

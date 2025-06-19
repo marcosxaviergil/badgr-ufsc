@@ -1,5 +1,3 @@
-# apps/badgrsocialauth/api.py
-
 from allauth.socialaccount.adapter import get_adapter
 from allauth.socialaccount.models import SocialAccount
 from django.core.exceptions import ValidationError

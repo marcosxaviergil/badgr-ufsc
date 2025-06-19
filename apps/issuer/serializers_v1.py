@@ -1,5 +1,3 @@
-# apps/issuer/serializers_v1.py
-
 import os
 import pytz
 import uuid
@@ -13,7 +11,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from . import utils
-from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1
+from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserIdentifierFieldV1
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
 from mainsite.serializers import DateTimeWithUtcZAtEndField, HumanReadableBooleanField, StripTagsCharField, MarkdownCharField, \

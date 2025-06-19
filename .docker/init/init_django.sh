@@ -1,3 +1,4 @@
+# .docker/init/init_django.sh
 #!/bin/bash
 
 set -eu
@@ -192,85 +193,23 @@ print('========================')
 "
 
 # ==========================================================
-# CONFIGURAÇÕES ESPECÍFICAS DO UFSC OAUTH
+# CONFIGURAÇÕES ESPECÍFICAS DO UFSC OAUTH (OPCIONAL)
 # ==========================================================
-echo ""
-echo "==> Configurando integração OAuth UFSC..."
+echo "==> Configurando integração UFSC..."
 
-# ✅ CONFIGURAR SOCIALAPP UFSC
 echo "🔧 Configurando SocialApp UFSC..."
-if python manage.py create_ufsc_socialapp; then
-    echo "✅ SocialApp UFSC configurado com sucesso"
-else
-    echo "❌ Falha ao configurar SocialApp UFSC"
-    echo "   Verifique se o comando create_ufsc_socialapp existe"
-fi
+python manage.py create_ufsc_socialapp 2>/dev/null || {
+    echo "⚠️ Falha ao configurar SocialApp UFSC (comando pode não existir ainda)"
+}
 
-# ✅ VERIFICAR CONFIGURAÇÃO UFSC OAUTH NATIVO
-echo "🧪 Verificando configuração OAuth UFSC..."
-python manage.py shell -c "
-import os
-from django.conf import settings
-from allauth.socialaccount.models import SocialApp
-from allauth.socialaccount import providers
-
-print('=== VERIFICAÇÃO OAUTH UFSC ===')
-
-# 1. Verificar se provider está registrado
-try:
-    ufsc_provider = providers.registry.by_id('ufsc')
-    print(f'✓ Provider UFSC registrado: {ufsc_provider.name}')
-except Exception as e:
-    print(f'✗ Provider UFSC não encontrado: {e}')
-    print('   Verifique INSTALLED_APPS em settings.py')
-
-# 2. Verificar SocialApp no banco
-try:
-    social_app = SocialApp.objects.get(provider='ufsc')
-    print(f'✓ SocialApp encontrado: {social_app.name}')
-    print(f'  Client ID: {social_app.client_id}')
-    print(f'  Sites: {[s.domain for s in social_app.sites.all()]}')
-except SocialApp.DoesNotExist:
-    print('✗ SocialApp UFSC não encontrado no banco')
-    print('   Execute: python manage.py create_ufsc_socialapp')
-
-# 3. Verificar configurações no settings
-ufsc_config = getattr(settings, 'SOCIALACCOUNT_PROVIDERS', {}).get('ufsc', {})
-if ufsc_config:
-    print('✓ Configuração UFSC encontrada no settings')
-    app_config = ufsc_config.get('APP', {})
-    client_id_settings = app_config.get('client_id', 'N/A')
-    print(f'  Client ID (settings): {client_id_settings}')
-else:
-    print('✗ Configuração UFSC não encontrada no settings')
-
-# 4. Verificar variáveis de ambiente
-env_client_id = os.environ.get('UFSC_OAUTH2_CLIENT_ID', 'edx-badges (padrão)')
-env_secret = os.environ.get('UFSC_OAUTH2_CLIENT_SECRET', 'Não definido')
-print(f'📋 Variáveis de ambiente:')
-print(f'  UFSC_OAUTH2_CLIENT_ID: {env_client_id}')
-print(f'  UFSC_OAUTH2_CLIENT_SECRET: {\"*\" * len(env_secret) if env_secret != \"Não definido\" else \"Não definido\"}')
-
-# 5. Verificar URLs (se possível)
-try:
-    from django.urls import reverse
-    login_url = reverse('ufsc_login')
-    callback_url = reverse('ufsc_callback')
-    print(f'✓ URLs OAuth disponíveis:')
-    print(f'  Login: {login_url}')
-    print(f'  Callback: {callback_url}')
-except Exception as e:
-    print(f'⚠ URLs OAuth não disponíveis: {e}')
-
-print('==========================')
-" || {
-    echo "⚠️ Falha na verificação OAuth UFSC"
+echo "🧪 Testando configuração OAuth UFSC..."
+python manage.py test_ufsc_oauth 2>/dev/null || {
+    echo "⚠️ Teste OAuth UFSC falhou (comando pode não existir ainda)"
 }
 
 # ==========================================================
 # VERIFICAÇÃO FINAL DO SISTEMA
 # ==========================================================
-echo ""
 echo "==> Verificação final do sistema..."
 MIGRATION_STATUS=$(python manage.py showmigrations --list 2>/dev/null | grep '\[ \]' | wc -l || echo "0")
 if [ "$MIGRATION_STATUS" -eq 0 ]; then
@@ -295,13 +234,9 @@ echo "   - Banco de dados: ✅ Conectado"
 echo "   - Migrações: ✅ Processadas"  
 echo "   - Arquivos estáticos: ✅ Coletados"
 echo "   - OAuth2 Applications: ✅ Configurados"
-echo "   - OAuth UFSC: ✅ Configurado e verificado"
+echo "   - OAuth UFSC: ✅ Tentado configurar"
 echo ""
 echo "🚀 Sistema pronto para uso!"
-echo "🔗 URLs de teste:"
-echo "   - Frontend: https://badges.setic.ufsc.br"
-echo "   - Admin: https://api-badges.setic.ufsc.br/admin/"
-echo "   - Login UFSC: https://api-badges.setic.ufsc.br/accounts/ufsc/login/"
-echo ""
-echo "🔑 Para testar OAuth UFSC:"
-echo "   curl https://api-badges.setic.ufsc.br/accounts/ufsc/login/"
+echo "📋 Login de teste: teste@ufsc.br / 123456"
+echo "🌐 Frontend: https://badges.setic.ufsc.br"
+echo "🔧 Admin: https://api-badges.setic.ufsc.br/admin/"

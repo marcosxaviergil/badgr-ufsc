@@ -1,4 +1,4 @@
-# settings_local.py 
+# settings_local.py is for all instance specific settings
 
 import random
 import string
@@ -142,4 +142,3 @@ LOGGING = {
     },
 }
 
-ACCOUNT_ADAPTER = 'badgrsocialauth.adapter.BadgrSocialAccountAdapter'
