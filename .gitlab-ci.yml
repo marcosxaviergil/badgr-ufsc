@@ -13,12 +13,34 @@ variables:
 
 before_script:
   - docker info
+  - |
+    echo ""
+    echo "  ██╗   ██╗███████╗███████╗ ██████╗ "
+    echo "  ██║   ██║██╔════╝██╔════╝██╔════╝ "
+    echo "  ██║   ██║█████╗  ███████╗██║      "
+    echo "  ██║   ██║██╔══╝  ╚════██║██║      "
+    echo "  ╚██████╔╝██║     ███████║╚██████╗ "
+    echo "  ╚═════╝ ╚═╝     ╚══════╝ ╚═════╝ "
+    echo "               u f s c              "
+    echo "  Universidade Federal de Santa Catarina"
+    echo "================================================================="
 
 build-server:
   stage: build
   only:
     - master
   script:
+    - |
+      echo ""
+      echo "  ███████╗███████╗████████╗██╗╔██████╗ "
+      echo "  ██╔════╝██╔════╝╚══██╔══╝██║║██╔═══╝"
+      echo "  ███████╗█████╗     ██║   ██║║██║"
+      echo "  ╚════██║██╔══╝     ██║   ██║║██║"
+      echo "  ███████║███████╗   ██║   ██║║██████╗"
+      echo "  ╚══════╝╚══════╝   ╚═╝   ╚═╝╚══════╝ "
+      echo "               s e t i c              "
+      echo "  Superintendência de Tecnologia da Informação e Comunicação"
+      echo "================================================================="
     - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
     - docker build --pull -f .docker/Dockerfile.prod.api -t "$CI_REGISTRY_IMAGE/server:$CI_COMMIT_REF_NAME" .
     - docker push "$CI_REGISTRY_IMAGE/server:$CI_COMMIT_REF_NAME"

@@ -1,4 +1,3 @@
-# .docker/init/init_django.sh
 #!/bin/bash
 
 set -eu

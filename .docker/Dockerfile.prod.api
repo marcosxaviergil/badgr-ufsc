@@ -1,94 +1,43 @@
-# =============================================================================
-# ESTÁGIO 1: Builder - Compilação das dependências
-# =============================================================================
-FROM python:3.8-slim as builder
+FROM python:3.8-slim-bookworm
 
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C.UTF-8
+ENV LC_ALL=C.UTF-8
 ENV PYTHONIOENCODING=UTF-8
 
-WORKDIR /build
-
-# Instalar dependências de compilação
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        build-essential \
-        default-libmysqlclient-dev \
-        libjpeg-dev \
-        zlib1g-dev \
-        libfreetype6-dev \
-        libffi-dev \
-        libcairo2-dev \
-        libxml2-dev \
-        libxslt1-dev \
-        libssl-dev \
-        python3-dev \
-        locales \
-        pkg-config && \
-    locale-gen en_US.UTF-8 && \
+    apt-get install -y --no-install-recommends apt-utils && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copiar e instalar dependências Python
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# =============================================================================
-# ESTÁGIO 2: Produção - Imagem final otimizada
-# =============================================================================
-FROM python:3.8-slim
-
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
-ENV PYTHONIOENCODING=UTF-8
-
-# ✅ CORREÇÃO PRINCIPAL: Instalar TODAS as dependências de runtime
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        bash \
-        locales \
-        libmariadb3 \
-        libmariadb-dev-compat \
-        default-libmysqlclient-dev \
-        libjpeg62-turbo \
-        libfreetype6 \
-        libpng16-16 \
-        libcairo2 \
-        libcairo-gobject2 \
-        libpango-1.0-0 \
-        libpangocairo-1.0-0 \
-        libgdk-pixbuf-2.0-0 \
-        libpcre3 \
-        libyaml-0-2 \
-        libjansson4 \
-        xmlsec1 \
-        libxml2 \
-        libxslt1.1 \
-        libxmlsec1 \
-        libxmlsec1-openssl \
-        libssl3 \
-        libffi8 \
-        libffi-dev \
-        libssl-dev \
-        zlib1g-dev \
-        libjpeg-dev \
-        nano \
-        curl \
-        netcat-openbsd && \
-    locale-gen en_US.UTF-8 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    mkdir /badgr_server
+    DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y \
+    default-libmysqlclient-dev \
+    gcc \
+    g++ \
+    make \
+    pkg-config \
+    python3-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    libffi-dev \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libgdk-pixbuf2.0-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    xmlsec1 \
+    curl \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /badgr_server
 WORKDIR /badgr_server
 
-# ✅ CORREÇÃO: Copiar bibliotecas Python E binários
-COPY --from=builder /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY requirements.txt /badgr_server/
+RUN pip install --no-cache-dir -r requirements.txt
 
-# ✅ CORREÇÃO: Copiar também bibliotecas compartilhadas se necessário
-COPY --from=builder /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/
-
-# Copiar arquivos da aplicação
 COPY manage.py /badgr_server/
 COPY .docker/etc/uwsgi.ini /badgr_server/
 COPY .docker/etc/wsgi.py /badgr_server/wsgi.py
@@ -96,22 +45,13 @@ COPY apps /badgr_server/apps/
 COPY .docker/etc/settings_local.prod.py /badgr_server/apps/mainsite/settings_local.py
 COPY .docker/init/init_django.sh /badgr_server/init_django.sh
 
-# ✅ Teste mais específico para debugging
 RUN chmod +x /badgr_server/init_django.sh && \
-    echo "🧪 Verificando instalação Python..." && \
-    python3 --version && \
-    echo "🧪 Verificando bibliotecas..." && \
-    python3 -c "import sys; print('Python path:', sys.path)" && \
-    echo "🧪 Testando MySQLclient..." && \
+    echo "🧪 Testando bibliotecas essenciais..." && \
     python3 -c "import MySQLdb; print('✅ MySQLdb OK')" && \
-    echo "🧪 Testando Pillow..." && \
     python3 -c "import PIL; print('✅ Pillow OK')" && \
-    echo "🧪 Testando Cairo..." && \
     python3 -c "import cairocffi; print('✅ cairocffi OK')" && \
-    echo "🧪 Testando uWSGI..." && \
-    python3 -c "import uwsgi; print('✅ uWSGI OK')" && \
-    echo "🎉 Todas as bibliotecas funcionam!"
+    echo "✅ uWSGI instalado com sucesso" && \
+    echo "🎉 Todas as bibliotecas funcionam corretamente!"
 
 EXPOSE 8911
-
-CMD ["./init_django.sh"]
+CMD ["sh", "-c", "./init_django.sh && uwsgi uwsgi.ini"]
