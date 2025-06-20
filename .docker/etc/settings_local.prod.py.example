@@ -1,0 +1,157 @@
+import os
+from mainsite.settings import *  # Importa tudo do settings base
+
+# ========== Django Core ==========
+SECRET_KEY = os.environ.get('SECRET_KEY', 'change-me-in-production')
+DEBUG = bool(int(os.environ.get('DEBUG', '0')))
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'api-badges.setic.ufsc.br,badges.setic.ufsc.br').split(',')
+
+USE_TZ = os.environ.get('USE_TZ', 'True').lower() in ['true', '1']
+TIME_ZONE = os.environ.get('TIME_ZONE', 'America/Sao_Paulo')
+LANGUAGE_CODE = 'pt-br'
+
+SITE_ID = int(os.environ.get('SITE_ID', '1'))
+
+# ========== Banco de Dados ==========
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.environ.get('BADGR_DB_NAME', 'badgr'),
+        'USER': os.environ.get('BADGR_DB_USER', 'badgr'),
+        'PASSWORD': os.environ.get('BADGR_DB_PASSWORD', 'password'),
+        'HOST': os.environ.get('BADGR_DB_HOST', 'db'),
+        'PORT': os.environ.get('BADGR_DB_PORT', '3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+        }
+    }
+}
+
+# ========== URLs e Redirecionamentos ==========
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = os.environ.get('LOGIN_REDIRECT_URL', '/docs')
+LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+# ========== OAUTH UFSC - CONFIGURAÇÃO CORRIGIDA ==========
+# ✅ SOBRESCREVE configuração do settings.py base com variáveis de ambiente
+SOCIALACCOUNT_PROVIDERS = {
+    'azure': {
+        'VERIFIED_EMAIL': True
+    },
+    'linkedin_oauth2': {
+        'VERIFIED_EMAIL': True
+    },
+    'ufsc': {
+        'APP': {
+            'client_id': os.environ.get('UFSC_OAUTH2_CLIENT_ID', 'edx-badges'),
+            'secret': os.environ.get('UFSC_OAUTH2_CLIENT_SECRET', 'sdf46sdfgsddfg'),
+            'key': ''
+        },
+        'SCOPE': ['openid', 'profile', 'email'],
+        'VERIFIED_EMAIL': False,
+        'AUTH_PARAMS': {
+            'access_type': 'online'
+        }
+    }
+}
+
+# ✅ Configurações Allauth (mantidas do settings base)
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+
+SOCIALACCOUNT_EMAIL_REQUIRED = False
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+
+# ========== Cache ==========
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+        'LOCATION': os.environ.get('MEMCACHED', 'memcached:11211'),
+        'KEY_PREFIX': 'badgr_',
+        'VERSION': 10,
+        'TIMEOUT': None,
+    }
+}
+
+# ========== Email ==========
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'mailhog')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '1025'))
+EMAIL_USE_TLS = bool(int(os.environ.get('EMAIL_USE_TLS', '0')))
+EMAIL_USE_SSL = bool(int(os.environ.get('EMAIL_USE_SSL', '0')))
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'badges@sistemas.ufsc.br')
+
+# ========== CORS ==========
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if origin.strip()]
+CORS_ALLOW_ALL_ORIGINS = len(CORS_ALLOWED_ORIGINS) == 0  # Se não definir origens, permite todas
+
+# ========== URLs de Origem ==========
+HTTP_ORIGIN = os.environ.get('HTTP_ORIGIN', 'https://api-badges.setic.ufsc.br')
+UI_URL = os.environ.get('UI_URL', 'https://badges.setic.ufsc.br')
+
+# ========== Arquivos Estáticos ==========
+STATIC_URL = '/static/'
+STATIC_ROOT = '/badgr_server/staticfiles'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = '/badgr_server/mediafiles'
+
+# ========== HTTPS via Proxy Reverso ==========
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# ========== Chaves de Segurança ==========
+from cryptography.fernet import Fernet
+AUTHCODE_SECRET_KEY = os.environ.get('AUTHCODE_SECRET_KEY', Fernet.generate_key().decode())
+UNSUBSCRIBE_SECRET_KEY = os.environ.get('UNSUBSCRIBE_SECRET_KEY', 'change-me-in-production')
+
+# ========== Configurações Específicas Badgr ==========
+BADGR_APPROVED_ISSUERS_ONLY = bool(int(os.environ.get('BADGR_APPROVED_ISSUERS_ONLY', '0')))
+CELERY_ALWAYS_EAGER = bool(int(os.environ.get('CELERY_ALWAYS_EAGER', '1')))
+
+# ========== Logging Produção ==========
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        },
+        'file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/badgr_server/logs/badgr.log',
+            'formatter': 'verbose'
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+        },
+        'badgr': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ufsc_oauth': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        }
+    },
+}
