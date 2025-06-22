@@ -1,0 +1,64 @@
+<div class="l-containerxaxis l-containeryaxis l-flex l-flex-justifycenter">
+	<form-message></form-message>
+
+	<div class="shadowcontainer u-animate-dropfade">
+		<!-- OAuth Banner -->
+		<oauth-banner></oauth-banner>
+
+		<!-- Title Message -->
+		<h3 class="u-text-h3-bold" id="heading-form">
+			Create a {{ theme.serviceName || "Badgr" }} Account
+		</h3>
+		
+		<p class="u-text u-text-body u-responsivemargin-top1x2x" *ngIf="! oAuthManager.currentAuthorization">
+			Please use your institutional UFSC account to create your Badgr account.
+		</p>
+		
+		<p class="u-text u-text-body u-responsivemargin-top1x2x" *ngIf="oAuthManager.currentAuthorization">
+			The application
+			<strong>
+				{{ oAuthManager.currentAuthorization.application.name }}
+			</strong>
+			would like to sign you in using {{ theme.serviceName || "Badgr"}}.
+		</p>
+
+		<!-- Apenas OAuth UFSC -->
+		<h3 class="ruleheadline l-ruleheadline" *ngIf="sessionService.enabledExternalAuthProviders.length > 0">
+			Sign Up With UFSC Account
+		</h3>
+
+		<div class="l-socialbuttons u-margin-top2x" *ngIf="sessionService.enabledExternalAuthProviders.length > 0">
+			<button
+				*ngFor="let provider of sessionService.enabledExternalAuthProviders"
+				(click)="sessionService.initiateUnauthenticatedExternalAuth(provider)"
+				class="socialbutton"
+				[style.backgroundColor]="provider.color">
+				<div class="visuallyhidden">Access with {{provider.label}}</div>
+				<img [src]="sanitize(provider.imgSrc)" alt="">
+			</button>
+		</div>
+
+		<p class="u-text-body u-text-center u-margin-top2x" *ngIf="sessionService.enabledExternalAuthProviders.length > 0">
+			Use your institutional UFSC credentials to create your account. Your email and personal information will be automatically configured from your UFSC profile.
+		</p>
+
+		<!-- Mensagem caso OAuth não esteja configurado -->
+		<div class="u-margin-top2x" *ngIf="sessionService.enabledExternalAuthProviders.length === 0">
+			<h3 class="u-text-h3-bold u-text-center">
+				UFSC Authentication Required
+			</h3>
+			<p class="u-text-body u-text-center u-margin-top1x">
+				Account creation is only available through UFSC institutional authentication. Please contact the administrator if you cannot access the system.
+			</p>
+		</div>
+
+		<!-- Botão de cancelar para OAuth -->
+		<div class="l-stack l-stack-2x l-stack-buttons u-margin-top3x" *ngIf="oAuthManager.currentAuthorization">
+			<button class="button button-secondary"
+			        type="button"
+			        (click)="oAuthManager.cancelCurrentAuthorization()">
+				Cancel
+			</button>
+		</div>
+	</div>
+</div>
