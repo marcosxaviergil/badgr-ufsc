@@ -1,0 +1,93 @@
+#!/bin/bash
+set -eu  # -e: parar ao errar; -u: falha se variável indefinida
+
+# ✅ Verifica variáveis obrigatórias
+: "${BADGR_DB_HOST:?Variável BADGR_DB_HOST não definida}"
+: "${BADGR_DB_PORT:?Variável BADGR_DB_PORT não definida}"
+
+echo "==> Aguardando o banco de dados MySQL em $BADGR_DB_HOST:$BADGR_DB_PORT..."
+until nc -z -v -w30 "$BADGR_DB_HOST" "$BADGR_DB_PORT"; do
+  echo "⏳ Aguardando conexão com o banco..."
+  sleep 5
+done
+echo "✅ Banco de dados disponível!"
+
+# 🛠️ Migrações
+echo "==> Rodando migrações do Django"
+python manage.py migrate --noinput
+
+# 🌐 Configuração do Site Django (importante para OAuth)
+echo "==> Configurando Site Django"
+python manage.py shell << EOF
+from django.contrib.sites.models import Site
+try:
+    site = Site.objects.get(id=1)
+    if site.domain != 'api-badges.setic.ufsc.br' or site.name != 'Badgr API - UFSC':
+        site.domain = 'api-badges.setic.ufsc.br'
+        site.name = 'Badgr API - UFSC'
+        site.save()
+        print('✅ Site atualizado: {}'.format(site.domain))
+    else:
+        print('✅ Site já configurado corretamente: {}'.format(site.domain))
+except Site.DoesNotExist:
+    site = Site.objects.create(
+        id=1,
+        domain='api-badges.setic.ufsc.br',
+        name='Badgr API - UFSC'
+    )
+    print('✅ Site criado: {}'.format(site.domain))
+EOF
+
+# 👤 Superusuário automático (se desejado)
+if [ "${CREATE_SUPERUSER:-0}" = "1" ]; then
+  echo "==> Verificando superusuário"
+  ADMIN_EMAIL="${ADMIN_EMAIL:-admin@api-badges.setic.ufsc.br}"
+  ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
+  
+  python manage.py shell << EOF
+from django.contrib.auth import get_user_model
+from django.db import IntegrityError
+
+User = get_user_model()
+
+try:
+    # Verifica se o usuário já existe
+    user = User.objects.get(email='${ADMIN_EMAIL}')
+    print('✅ Superusuário já existe: {}'.format(user.email))
+    print('   ⚠️  Senha e dados do usuário NÃO foram alterados')
+    
+    # Verifica se é superusuário, se não for, atualiza apenas essa flag
+    if not user.is_superuser:
+        user.is_superuser = True
+        user.is_staff = True
+        user.save(update_fields=['is_superuser', 'is_staff'])
+        print('   ✅ Permissões de superusuário concedidas')
+        
+except User.DoesNotExist:
+    # Cria novo usuário apenas se não existir
+    try:
+        user = User.objects.create_superuser(
+            email='${ADMIN_EMAIL}',
+            first_name='Admin',
+            last_name='UFSC',
+            password='${ADMIN_PASSWORD}'
+        )
+        print('✅ Superusuário criado: {}'.format(user.email))
+        print('   ⚠️  ATENÇÃO: Altere a senha padrão após o primeiro login!')
+    except IntegrityError as e:
+        print('❌ Erro ao criar superusuário: {}'.format(str(e)))
+    except Exception as e:
+        print('❌ Erro inesperado: {}'.format(str(e)))
+EOF
+fi
+
+# 📁 Coleta de arquivos estáticos
+STATIC_DIR="/badgr_server/staticfiles"
+if [ ! -d "$STATIC_DIR" ] || [ -z "$(ls -A "$STATIC_DIR" 2>/dev/null)" ]; then
+  echo "==> Coletando arquivos estáticos"
+  python manage.py collectstatic --noinput
+else
+  echo "✅ Arquivos estáticos já presentes em $STATIC_DIR"
+fi
+
+echo "✅ Inicialização concluída"
