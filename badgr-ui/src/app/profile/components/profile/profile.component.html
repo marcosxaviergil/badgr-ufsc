@@ -1,0 +1,122 @@
+<form-message></form-message>
+<ng-template sourceListener></ng-template>
+<main *bgAwaitPromises="[profileLoaded, emailsLoaded]">
+	<div class="topbar">
+		<div class="l-containerxaxis">
+			<div class="topbar-x-heading l-spacestack">
+				{{ profile?.firstName }} {{ profile?.lastName}}
+				<div class="l-primarymore">
+					<!-- Remover botão de mudança de senha -->
+					<p class="u-text-body u-text-dark3">
+						Password is managed by your institutional UFSC account.
+					</p>
+					<button [bgPopupMenuTrigger]="editMenu"
+					        class="buttonicon buttonicon-secondary"
+					        id="trigger2">
+						<svg icon="icon_more"></svg>
+						<span class="visuallyhidden">More</span>
+					</button>
+				</div>
+			</div>
+		</div>
+		<bg-popup-menu #editMenu class="menu" id="menu2">
+			<div [routerLink]="['/profile/edit']" class="menuitem">
+				<svg icon="icon_edit"></svg>
+				Edit
+			</div>
+		</bg-popup-menu>
+	</div>
+
+	<div class="l-containerxaxis l-containeryaxis">
+		<div class="l-stack u-margin-yaxis3x">
+			<p class="u-text-h3-bold u-text-dark2">
+				Emails
+			</p>
+			
+			<!-- Remover formulário de adicionar email -->
+			<p class="u-text-body u-text-dark3">
+				Email addresses are managed by your institutional UFSC account and cannot be modified here.
+			</p>
+		</div>
+
+		<table class="datatable datatable-roundheaders datatable-tallrows">
+			<thead class="datatable-x-head">
+			<tr class="datatable-x-header">
+				<th class="datatable-x-cell" style="width:80%;">Email Address</th>
+				<th class="datatable-x-cell">Status</th>
+				<!-- Remover coluna de ações -->
+			</tr>
+			</thead>
+			<tbody class="datatable-x-body">
+			<tr class="datatable-x-row" *ngFor="let email of emails">
+				<td class="datatable-x-cell">
+					<div class="l-stack l-stack-start">
+						<p class="u-text-body u-break-word">
+							{{email.email}}
+						</p>
+						<div *ngIf="email.primary"
+						     class="badgestatus badgestatus-new badgestatus-intable">
+							primary
+						</div>
+					</div>
+				</td>
+				<td class="datatable-x-cell u-text-body">
+					<div class="l-flex l-flex-aligncenter l-flex-1x">
+						<div class="l-flex l-flex-aligncenter l-flex-1x">
+							<svg icon="icon_checkmark_circle"
+							     class="icon icon-success"
+							     viewBox="0 0 24 24"></svg>
+							<p class="u-text-body u-hidden-maxtablet">
+								Verified by UFSC
+							</p>
+						</div>
+					</div>
+				</td>
+				<!-- Remover coluna de ações completamente -->
+			</tr>
+			</tbody>
+		</table>
+
+		<!-- Seção de contas vinculadas - manter mas com informação -->
+		<ng-template [ngIf]="(socialAccounts.length > 0) || (configService.featuresConfig?.socialAccountProviders?.length > 0)">
+			<h2 class="u-text-h3-bold u-margin-yaxis3x u-text-dark2">Linked Accounts</h2>
+
+			<table class="datatable datatable-roundheaders" *ngIf="socialAccounts.length > 0">
+				<thead class="datatable-x-head">
+				<tr class="datatable-x-header">
+					<th class="datatable-x-cell">Service</th>
+					<th class="datatable-x-cell">Account</th>
+					<th class="datatable-x-cell">Status</th>
+				</tr>
+				</thead>
+				<tbody class="datatable-x-body">
+				<tr *ngFor="let account of socialAccounts" class="datatable-x-row">
+					<td class="datatable-x-cell u-text-small">
+						{{ account.providerInfo?.name }}
+					</td>
+					<td class="datatable-x-cell u-text-small u-break-all">
+						{{ account.fullLabel }}
+					</td>
+					<td class="datatable-x-cell">
+						<span class="u-text-small u-text-dark3">
+							Connected
+						</span>
+					</td>
+				</tr>
+				</tbody>
+			</table>
+
+			<p class="u-text-body u-margin-yaxis3x u-width-paragraph">
+				Your account is connected to UFSC institutional authentication system. 
+				This connection is managed by your institution and cannot be modified here.
+			</p>
+
+			<!-- Remover botões de vincular outras contas -->
+			<div class="rule u-margin-bottom2x"></div>
+			
+			<p class="u-text-small u-text-dark3">
+				Account linking is managed through your institutional UFSC system.
+			</p>
+		</ng-template>
+	</div>
+</main>
