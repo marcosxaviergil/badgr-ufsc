@@ -1,0 +1,69 @@
+{% load staticfiles %}
+<!doctype html>
+<html prefix="og: http://ogp.me/ns#">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Badgr API Documentation - v{{ version }}</title>
+    <meta name="description" content="Badgr API Documentation">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'badgr-ui/images/favicon.png' %}">
+    <link rel="shortcut icon" href="{% static 'badgr-ui/images/favicon.ico' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'swagger-ui/swagger-ui.css' %}" />
+    
+    <style>
+        html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+        *, *:before, *:after { box-sizing: inherit; }
+        body { margin:0; background: #fafafa; }
+        .swagger-ui .topbar { background-color: #3b82c4; }
+        .swagger-ui .topbar .download-url-wrapper .download-url-button { background: #3d82c5; }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    
+    <script src="{% static 'swagger-ui/swagger-ui-bundle.js' %}"></script>
+    <script src="{% static 'swagger-ui/swagger-ui-standalone-preset.js' %}"></script>
+    
+    <script>
+        function initSwagger() {
+            if (typeof SwaggerUIBundle === 'undefined' || typeof SwaggerUIStandalonePreset === 'undefined') {
+                setTimeout(initSwagger, 50);
+                return;
+            }
+            
+            try {
+                const ui = SwaggerUIBundle({
+                    url: "{% static 'swagger-ui' %}/badgr_spec_{{ version }}.json",
+                    dom_id: '#swagger-ui',
+                    deepLinking: true,
+                    presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+                    plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+                    layout: "StandaloneLayout",
+                    validatorUrl: null
+                });
+                
+                if (ui && typeof ui.initOAuth === 'function') {
+                    ui.initOAuth({ clientId: "badgr-api-docs", scopeSeparator: " " });
+                }
+                
+                window.ui = ui;
+            } catch (error) {
+                document.getElementById('swagger-ui').innerHTML = 
+                    '<div style="padding: 20px; text-align: center; color: #666;">' +
+                    '<h3>Erro ao carregar documentação</h3>' +
+                    '<p>Erro: ' + error.message + '</p>' +
+                    '<p><a href="{% static "swagger-ui" %}/badgr_spec_{{ version }}.json">Ver JSON diretamente</a></p>' +
+                    '</div>';
+            }
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSwagger);
+        } else {
+            initSwagger();
+        }
+    </script>
+</body>
+</html>

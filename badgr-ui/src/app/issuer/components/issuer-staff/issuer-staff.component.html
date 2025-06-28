@@ -1,0 +1,100 @@
+<div *bgAwaitPromises="[issuerLoaded, profileEmailsLoaded]">
+	<form-message></form-message>
+	<div class="topbar topbar-withimage">
+		<div class="l-containerxaxis">
+			<div class="topbar-x-breadcrumbs">
+				<bg-breadcrumbs
+					[linkentries]="breadcrumbLinkEntries"
+				>
+				</bg-breadcrumbs>
+			</div>
+			<div class="topbar-x-wrap">
+				<img *ngIf="issuer.image" class="topbar-x-image" [src]="issuer.image" alt="Logo do {{issuer.name}}" />
+				<img *ngIf="!issuer.image" class="topbar-x-image" [src]="issuerImagePlaceHolderUrl" alt="Imagem padrão do emissor">
+				<h1 class="topbar-x-heading">
+					{{ isCurrentUserIssuerOwner ? "Gerenciar Equipe" : "Visualizar Equipe" }}
+				</h1>
+				<div class="topbar-x-subheading">
+					{{
+					isCurrentUserIssuerOwner
+					? "Gerencie quem tem acesso para gerenciar e agir em nome deste emissor."
+					: "Visualize quem tem acesso para gerenciar e agir em nome deste emissor."
+					}}
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="l-containerxaxis l-containeryaxis">
+		<div class="l-stack u-margin-bottom2x" *ngIf="isCurrentUserIssuerOwner">
+			<p class="u-text-h3-bold">Membros da Equipe</p>
+			<issuer-staff-create-dialog #issuerStaffCreateDialog></issuer-staff-create-dialog>
+			<button
+				class="button button-secondary"
+				(click)="addStaff()">Adicionar Membro</button>
+		</div>
+
+		<table class="datatable datatable-roundheaders datatable-onlyfirstcolumntablet datatable-verticalalignmiddle">
+			<thead class="datatable-x-head">
+				<tr class="datatable-x-header">
+					<th class="datatable-x-cell">Nome</th>
+					<th class="datatable-x-cell">ID</th>
+					<th class="datatable-x-cell">Função</th>
+				</tr>
+			</thead>
+			<tbody class="datatable-x-body">
+
+				<tr *ngFor="let member of issuer.staff" class="datatable-x-row">
+					<td class="datatable-x-cell u-text-body">
+						{{ member.nameLabel }}
+						<div class="l-flex l-flex-column l-flex-2x u-hidden-mintablet u-margin-top2x">
+							<p class="u-text-small u-text-breakword">
+								{{ memberId(member) }}
+							</p>
+							<div class="forminput forminput-full" *ngIf="isCurrentUserIssuerOwner">
+								<div class="forminput-x-label">Função</div>
+								<div class="forminput-x-inputs">
+									<select [value]="member.roleSlug" [disabled]="member == issuer.currentUserStaffMember" (change)="changeMemberRole(member, $event.target.value)"
+									 *ngIf="isCurrentUserIssuerOwner">
+										<option *ngFor="let role of issuerStaffRoleOptions" [value]="role.value">{{ role.label }}</option>
+									</select>
+								</div>
+							</div>
+							<span *ngIf="! isCurrentUserIssuerOwner">
+								{{ member.roleInfo.label }}
+							</span>
+							<div *ngIf="isCurrentUserIssuerOwner">
+								<button class="u-text-link-small" type="button" [disabled-when-requesting]="true" (click)="removeMember(member)"
+								 *ngIf="member != issuer.currentUserStaffMember">Remover
+								</button>
+							</div>
+						</div>
+					</td>
+					<td class="datatable-x-cell u-text-small">
+						{{ memberId(member) }}
+					</td>
+					<td class="datatable-x-cell">
+						<div class="l-flex l-flex-aligncenter l-flex-2x">
+							<span *ngIf="! isCurrentUserIssuerOwner">
+								{{ member.roleInfo.label }}
+							</span>
+							<div class="forminput" *ngIf="isCurrentUserIssuerOwner">
+								<div class="forminput-x-inputs">
+									<select [value]="member.roleSlug" [disabled]="member == issuer.currentUserStaffMember" (change)="changeMemberRole(member, $event.target.value)"
+									 *ngIf="isCurrentUserIssuerOwner">
+										<option *ngFor="let role of issuerStaffRoleOptions" [value]="role.value">{{ role.label }}</option>
+									</select>
+								</div>
+							</div>
+							<div *ngIf="isCurrentUserIssuerOwner" class="u-margin-leftauto">
+								<button class="u-text-link-small" type="button" [disabled-when-requesting]="true" (click)="removeMember(member)"
+								*ngIf="member != issuer.currentUserStaffMember">Remover
+								</button>
+							</div>
+						</div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</div>

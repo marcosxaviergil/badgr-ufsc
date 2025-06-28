@@ -1,0 +1,68 @@
+<ng-container *bgAwaitPromises="[profileLoaded]">
+	<form-message></form-message>
+
+	<div class="topbar">
+
+		<div class="l-containerxaxis">
+			<div class="topbar-x-breadcrumbs">
+				<bg-breadcrumbs [linkentries]="crumbs">
+				</bg-breadcrumbs>
+			</div>
+		</div>
+
+		<div class="l-containerxaxis">
+			<div class="topbar-x-heading">
+				Editar Nome do Perfil
+			</div>
+		</div>
+	</div>
+
+	<div class="l-containerxaxis l-containeryaxis">
+		<!-- ✅ NOVO: Aviso para usuários UFSC -->
+		<div *ngIf="isUfscUser" class="u-margin-bottom2x">
+			<div class="alert alert-info">
+				<svg icon="icon_info"></svg>
+				<span>Seu nome é automaticamente gerenciado por sua conta institucional da UFSC e não pode ser alterado aqui.</span>
+			</div>
+		</div>
+
+		<form [formGroup]="profileEditForm.rawControl"
+		      (ngSubmit)="submitEdit()"
+		      class="l-form"
+		      novalidate
+		>
+			<div class="u-width-form">
+				<bg-formfield-text [control]="profileEditForm.rawControlMap.firstName"
+				                   [label]="'Primeiro Nome'"
+				                   [errorMessage]="'Por favor, digite seu primeiro nome'"
+				                   class="u-margin-bottom2x forminput-large"
+				                   [locked]="isUfscUser"
+				>
+				</bg-formfield-text>
+
+				<bg-formfield-text [control]="profileEditForm.rawControlMap.lastName"
+				                   [label]="'Sobrenome'"
+				                   [errorMessage]="'Por favor, digite seu sobrenome'"
+				                   class="u-margin-bottom4x forminput-large"
+				                   [locked]="isUfscUser"
+				></bg-formfield-text>
+			</div>
+
+			<div class="l-flex l-flex-1x">
+				<a class="button button-secondary"
+				   [routerLink]="['../profile']"
+				   [disabled-when-requesting]="true"
+				>Cancelar</a>
+
+				<!-- ✅ MODIFICADO: Desabilitar botão Save para usuários UFSC -->
+				<button type="submit"
+				        class="button"
+				        [disabled-when-requesting]="true"
+				        [disabled]="isUfscUser"
+				>
+					Salvar
+				</button>
+			</div>
+		</form>
+	</div>
+</ng-container>

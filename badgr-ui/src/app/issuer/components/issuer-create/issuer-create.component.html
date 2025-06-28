@@ -1,0 +1,96 @@
+<form-message></form-message>
+<div class="topbar">
+	<div class="l-containerxaxis">
+		<div class="topbar-x-heading">
+			Criar Emissor
+		</div>
+		<div class="topbar-x-subheading">
+			Criar um emissor permite que você conceda badges aos destinatários.
+		</div>
+	</div>
+</div>
+
+
+<div class="l-containerxaxis">
+
+	<form (ngSubmit)="onSubmit()"
+	      class="u-width-formsmall u-margin-top3x"
+	      novalidate
+	>
+		<bg-formfield-image #imageField
+		                    label="Imagem (Opcional)"
+		                    imageLoaderName="issuer"
+		                    [placeholderImage]="issuerImagePlacholderUrl"
+		                    [control]="issuerForm.rawControlMap.issuer_image"
+		></bg-formfield-image>
+
+		<bg-formfield-text class="u-margin-yaxis2x"
+		                   [control]="issuerForm.rawControlMap.issuer_name"
+		                   [label]="'Nome'"
+		                   [errorMessage]="{required:'Por favor, insira um nome de emissor'}"
+		                   [autofocus]="true"
+		></bg-formfield-text>
+
+		<bg-formfield-text class="u-margin-bottom2x"
+		                   [control]="issuerForm.rawControlMap.issuer_url"
+		                   [label]="'URL do Website'"
+		                   [errorMessage]="'Por favor, insira uma URL válida'"
+		                   [urlField]="true"
+		                   [fieldType]="'url'"
+		                   type="url"
+		></bg-formfield-text>
+
+		<bg-formfield-select class="u-margin-bottom2x"
+		                     [control]="issuerForm.rawControlMap.issuer_email"
+		                     [label]="'E-mail de Contato'"
+		                     [placeholder]="'Por favor, selecione um e-mail verificado'"
+		                     [options]="emailsOptions"
+		                     [errorMessage]="{required:'Por favor, selecione um e-mail verificado'}"
+		></bg-formfield-select>
+
+		<bg-formfield-text class="u-margin-bottom2x"
+		                   [control]="issuerForm.rawControlMap.issuer_description"
+		                   [label]="'Descrição'"
+		                   [errorMessage]="{ required: 'Por favor, insira uma descrição'}"
+		                   [multiline]="true"
+		></bg-formfield-text>
+
+		<label [class.checkbox-is-error]="issuerForm.rawControlMap.agreedTerms.dirty && !issuerForm.rawControlMap.agreedTerms.valid"
+					 *ngIf="dataProcessorUrl"
+		       class="checkbox  l-marginBottom-2x"
+		       for="terms"
+		>
+			<input name="terms"
+			       id="terms"
+			       type="checkbox"
+			       [formControl]="issuerForm.rawControlMap.agreedTerms"
+			>
+			<span class="checkbox-x-text">Eu li e concordo com o <a target="_blank"
+			                                                              [href]="dataProcessorUrl"
+			>Adendo de
+						Processamento de Dados</a>.
+				<div *ngIf="issuerForm.rawControlMap.agreedTerms.dirty && !issuerForm.rawControlMap.agreedTerms.valid"
+				     class="checkbox-x-errortext"
+				>Por favor,
+						leia e concorde com o Adendo de Processamento de Dados se quiser continuar.</div>
+				</span>
+
+		</label>
+
+		<div class="l-flex l-flex-1x u-margin-bottom3x u-margin-top4x">
+			<a [routerLink]="['/issuer']"
+			   class="button button-secondary"
+			   [disabled-when-requesting]="true"
+			>Cancelar</a>
+			<button type="submit"
+			        class="button"
+			        [disabled]="!! addIssuerFinished"
+			        [loading-promises]="[ addIssuerFinished ]"
+			        loading-message="Adicionando"
+			>Adicionar Emissor
+			</button>
+		</div>
+
+
+	</form>
+</div>

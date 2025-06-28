@@ -1,0 +1,60 @@
+<section class="l-containerxaxis l-containeryaxis">
+    <div class="u-width-form">
+        <article class="contentlong">
+            <h2>Instruções</h2>
+            <p>
+                Você pode importar uma lista de pessoas para conceder este badge. Seu arquivo deve atender aos seguintes requisitos:
+            </p>
+            <ol>
+                <li>
+                    Contém endereço de e-mail e a URL de Evidência.
+                </li>
+                <li>Apenas formato CSV ou TXT.</li>
+            </ol>
+            <p>
+                Use este
+                <a
+                    [href]="badgrBulkIssueTemplateUrl"
+                    download="badgr-bulk-issue-template.csv"
+                >
+                    Modelo de Exemplo
+                </a>
+                para criar um arquivo CSV ou TXT para Emissão em Massa de badges.
+            </p>
+        </article>
+        <form
+            [formGroup]="csvForm"
+            class
+        >
+            <fieldset>
+                <bg-formfield-file
+                    #fileField
+                    label="Arquivo"
+                    validFileTypes="text/plain,.csv"
+                    [control]="csvForm.controls['zipFile']"
+                    [placeholderImage]="csvUploadIconUrl"
+                    (fileData)=onFileDataReceived($event)
+                >
+                </bg-formfield-file>
+            </fieldset>
+        </form>
+
+        <div class="l-flex l-flex-1x u-margin-top2x">
+            <button
+                class="button button-secondary"
+                (click)="updateViewState('cancel')"
+            >
+                Cancelar
+            </button>
+
+            <button
+                class="button l-marginLeft-x2"
+                [class.button-is-disabled]="rawCsv === null"
+                [attr.disabled]="rawCsv ? null : true "
+                (click)="importAction()"
+            >
+                Importar
+            </button>
+        </div>
+    </div>
+</section>

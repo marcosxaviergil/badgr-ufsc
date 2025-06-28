@@ -1,0 +1,46 @@
+<div class="l-containerxaxis l-containeryaxis l-flex l-flex-justifycenter">
+
+		<div class="shadowcontainer u-animate-dropfade">
+		<!--<markdown-display
+			[value]="theme.welcomeMessage || 'Bem-vindo ao Badgr'"
+		></markdown-display>-->
+
+
+		<!-- Apenas autenticação OAuth UFSC -->
+		<ng-template [ngIf]="sessionService.enabledExternalAuthProviders.length">
+<!--
+			<h3 class="l-ruleheadline ruleheadline">
+				Entrar com Conta UFSC
+			</h3>
+-->
+			<div class="l-socialbuttons u-margin-top2x">
+				<button
+					*ngFor="let provider of sessionService.enabledExternalAuthProviders"
+					(click)="sessionService.initiateUnauthenticatedExternalAuth(provider)"
+					class="socialbutton socialbutton-with-text"
+					[style.backgroundColor]="provider.color">
+					<div class="visuallyhidden">Acessar com {{provider.label}}</div>
+					<img [src]="sanitize(provider.imgSrc)" alt="" class="socialbutton-icon">
+					<!-- ✅ NOVO: Adicionar texto visível no botão -->
+					<span class="socialbutton-text">{{provider.label}}</span>
+				</button>
+			</div>
+			<p class="u-text-body u-text-center u-margin-top2x">
+				Por favor, use sua conta institucional da UFSC para acessar este sistema.
+			</p>
+		</ng-template>
+
+		<!-- Mensagem caso não haja provedores OAuth configurados -->
+		<ng-template [ngIf]="!sessionService.enabledExternalAuthProviders.length">
+			<div class="l-flex l-flex-column l-flex-aligncenter u-margin-top2x">
+				<h3 class="u-text-h3-bold u-text-center">
+					Autenticação Necessária
+				</h3>
+				<p class="u-text-body u-text-center u-margin-top1x">
+					Este sistema requer autenticação institucional da UFSC. Por favor, entre em contato com o administrador.
+				</p>
+			</div>
+		</ng-template>
+	</div>
+</div>
+<form-message></form-message>

@@ -1,0 +1,376 @@
+<ng-container *bgAwaitPromises="[ issuerLoaded, badgeClassLoaded ]">
+	<form-message></form-message>
+
+	<div class="topbar">
+		<div class="l-containerxaxis">
+			<div class="topbar-x-breadcrumbs">
+				<bg-breadcrumbs [linkentries]="breadcrumbLinkEntries"></bg-breadcrumbs>
+			</div>
+			<div class="topbar-x-heading">
+				Conceder Badge
+			</div>
+			<div class="topbar-x-subheading">
+				Conceda badges para os indivíduos abaixo, ou
+				<a class="u-text"
+				   [routerLink]="['/issuer/issuers', issuerSlug, 'badges', badgeSlug, 'bulk-import']"
+				>clique aqui para
+				conceder em massa</a>
+				para múltiplos destinatários de uma vez.
+			</div>
+		</div>
+	</div>
+
+	<div class="l-containerxaxis l-containeryaxis">
+		<form class="l-responsivelist"
+		      [formGroup]="issueForm.rawControl"
+		      (ngSubmit)="onSubmit()"
+		      novalidate
+		>
+			<!-- Recipient Information -->
+			<div class="formsection"
+			     role="group"
+			     aria-labelledby="heading-recipientinformation"
+			>
+				<h3 class="formsection-x-title u-text-dark2"
+				    id="heading-recipientinformation"
+				>
+					Informações do destinatário
+				</h3>
+				<div class="formsection-x-help">
+					<h3 class="u-text-body-bold">Badge Awarding</h3>
+					<p class="u-text u-margin-top1x u-margin-bottom2x">
+						Você pode conceder um badge usando o e-mail, a URL ou o número de telefone do destinatário.
+					</p>
+					<a href="https://support.badgr.io/pages/viewpage.action?pageId=2981918"
+					   target="_blank"
+					   class="u-text-outlink"
+					>Saiba
+						Mais
+						<svg icon="icon_external_link"></svg>
+					</a>
+				</div>
+				<div class="formsection-x-body">
+					<div class="forminput">
+						<label class="forminput-x-label">Nome do destinatário (opcional)</label>
+						<bg-formfield-text [control]="issueForm.rawControlMap.recipientprofile_name"
+						                   ariaLabel="Recipient Name (optional)"
+						></bg-formfield-text>
+						<p class="u-text u-text-small u-text-dark4 u-margin-top1x u-margin-bottom2x">
+							<strong>Note</strong>
+							: O nome do destinatário aparecerá no badge concedido
+							em texto simples.
+						</p>
+					</div>
+					<div class="forminput forminput-full">
+						<label class="forminput-x-label">Identifier</label>
+						<div class="l-spacestack l-spacestack-auto">
+							<bg-formfield-select ariaLabel="Select Options"
+							                     [control]="issueForm.rawControlMap.recipient_type"
+							                     [optionMap]="identifierOptionMap"
+							></bg-formfield-select>
+
+							<bg-formfield-text [control]="issueForm.rawControlMap.recipient_identifier"
+							                   ariaLabel="Recipient Identifier"
+							                   [autofocus]="true"
+							                   [fieldType]="recipientIdentifierFieldType"
+							></bg-formfield-text>
+							<div class="u-text-error u-text-small" *ngIf="idError==='invalidEmail'">Please enter a valid email.</div>
+							<div class="u-text-error u-text-small" *ngIf="idError==='invalidUrl'">Please enter a valid URL.</div>
+							<div class="u-text-error u-text-small" *ngIf="idError==='invalidTelephone'">Please enter a valid phone number.</div>
+						</div>
+					</div>
+					<div class="l-formsection-x-checkbox"
+					     *ngIf="issueForm.controls.recipient_type.value == 'email'"
+					>
+						<label class="checkbox checkbox-center u-margin-top2x"
+						       for="notifybyemail"
+						>
+							<input name="notifybyemail"
+							       id="notifybyemail"
+							       type="checkbox"
+							       [formControl]="issueForm.rawControlMap.notify_earner"
+							>
+							<span class="checkbox-x-text">Notificar Destinatário por E-mail</span>
+						</label>
+					</div>
+				</div>
+			</div>
+
+			<!-- Narrative -->
+			<div class="formsection"
+			     role="group"
+			     aria-labelledby="heading-narrative"
+			     *ngIf="narrativeEnabled"
+			>
+				<div class="formsection-x-title">
+					<h2>
+						Narrativa
+						<span>(Opcional)</span>
+					</h2>
+					<button class="buttonicon buttonicon-link"
+					        (click)="narrativeEnabled = false"
+					        type="button"
+					>
+						<svg icon="icon_close"></svg>
+						<span class="visuallyhidden">Fechar</span>
+					</button>
+				</div>
+
+				<div class="formsection-x-help">
+					<h3 class="u-text-body-bold">O que é Narrativa?</h3>
+					<p class="u-text u-margin-top1x u-margin-bottom2x">
+						A narrativa é uma descrição geral da conquista relacionada ao badge.
+					</p>
+					<a href="https://support.badgr.io/pages/viewpage.action?pageId=2981918"
+					   class="u-text-outlink"
+					>Saiba Mais
+						<svg icon="icon_external_link"></svg>
+					</a>
+				</div>
+				<div class="formsection-x-body">
+					<bg-formfield-markdown class="l-formsection-x-inputoffset"
+					                       [control]="issueForm.rawControlMap.narrative"
+					                       label="How did the recipient earn this badge?"
+					></bg-formfield-markdown>
+				</div>
+			</div>
+
+			<!-- Evidence -->
+			<div class="formsection"
+			     role="group"
+			     aria-labelledby="heading-evidence"
+			     *ngIf="evidenceEnabled"
+			>
+				<div class="formsection-x-title">
+					<h2>
+						Evidência
+						<span>(Opcional)</span>
+					</h2>
+					<button class="buttonicon buttonicon-link"
+					        (click)="evidenceEnabled = false"
+					        type="button"
+					>
+						<svg icon="icon_close"></svg>
+						<span class="visuallyhidden">Fechar</span>
+					</button>
+				</div>
+				<div class="formsection-x-help">
+
+					<h3 class="u-text-body-bold">
+						O que é Evidência?
+					</h3>
+					<p class="u-text u-margin-top1x u-margin-bottom2x">
+						A evidência é uma prova apresentada de que o portador atende aos critérios para o badge ao qual está se candidatando.
+						Isso pode ser feito na forma de uma narrativa que descreva a evidência e o processo da conquista e/ou uma URL de uma
+						página da web que apresente a evidência da conquista.
+					</p>
+					<a href="https://support.badgr.io/pages/viewpage.action?pageId=2981918"
+					   class="u-text-outlink"
+					>Saiba Mais
+						<svg icon="icon_external_link"></svg>
+					</a>
+				</div>
+				<div class="formsection-x-body">
+					<ng-container *ngFor="let evidence of issueForm.controls.evidence_items.controls; let i=index">
+						<div class="l-flex l-flex-1x l-flex-justifybetween u-margin-bottom2x">
+							<h3 class="u-text-body-bold u-text-dark1">Evidência {{i + 1}}</h3>
+							<button class="u-text-link"
+							        aria-labelledby="heading-nestedevidence"
+							        *ngIf="issueForm.controls.evidence_items.length > 1"
+							        (click)="removeEvidence(i)"
+							        type="button"
+							>
+								Remover
+							</button>
+						</div>
+						<bg-formfield-markdown [control]="evidence.rawControlMap.narrative"
+						                       label="How is this badge earned?"
+						></bg-formfield-markdown>
+						<bg-formfield-text class="u-margin-top2x u-margin-bottom6x"
+						                   [control]="evidence.rawControlMap.evidence_url"
+						                   label="URL to Evidence Page"
+						                   fieldType="url"
+						                   [urlField]="true"
+						                   errorMessage="Please enter a valid URL"
+						></bg-formfield-text>
+					</ng-container>
+
+					<div class="l-stack">
+						<button class="button button-secondary"
+						        type="button"
+						        (click)="addEvidence()"
+						>
+							Incluir evidência adicional
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Expiration -->
+			<div class="formsection"
+			     role="group"
+			     aria-labelledby="heading-expiration"
+			     *ngIf="expirationEnabled"
+			>
+				<div class="formsection-x-title">
+					<h2>
+						Expiração
+						<span>(Opcional)</span>
+					</h2>
+					<button class="buttonicon buttonicon-link"
+					        (click)="expirationEnabled = false"
+					        type="button"
+					>
+						<svg icon="icon_close"></svg>
+						<span class="visuallyhidden">Fechar</span>
+					</button>
+				</div>
+
+
+				<div class="formsection-x-help">
+					<h3 class="u-text-body-bold">O que é Expiração?</h3>
+					<p class="u-text u-margin-top1x u-margin-bottom2x">
+						Este badge está configurado para expirar. Você pode editar a data de expiração ou remover esta
+						seção se não quiser que este distintivo expire.
+					</p>
+					<a href="https://support.badgr.io/pages/viewpage.action?pageId=2981918"
+					   class="u-text-outlink"
+					>Saiba Mais
+						<svg icon="icon_external_link"></svg>
+					</a>
+				</div>
+
+				<div class="formsection-x-body">
+
+					<div *ngIf="!defaultExpiration || expirationDateEditable"
+					     class="formfield"
+					>
+						<bg-formfield-text label="Expiration Date"
+															 id="date"
+															 fieldType="date"
+						                   [control]="issueForm.rawControlMap.expires"
+						                   ariaLabel="Expiration date"
+						                   [errorMessage]="'Please enter a date in the format YYYY/mm/dd'"
+						></bg-formfield-text>
+						<div class="u-text-error u-text-small" *ngIf="dateError">Por favor, insira uma data no formato AAAA-mm-dd.</div>
+					</div>
+					<div *ngIf="defaultExpiration && !expirationDateEditable"
+					     class="forminput"
+					>
+
+						<label class="forminput-x-label"
+						       for="date"
+						>
+							Data de Expiração
+						</label>
+						<h1 class="u-text-h3-bold">
+							<strong>{{defaultExpiration|date}}</strong>
+							<button class="u-text-link-small u-display-inline u-margin-left1x"
+							        type="button"
+							        tabindex="0"
+							        (click)="expirationDateEditable = true"
+							>
+								Editar
+							</button>
+						</h1>
+
+					</div>
+				</div>
+			</div>
+
+			<!-- Add Optional Details -->
+			<div class="formsection formsection-nohelp"
+			     role="group"
+			     aria-labelledby="heading-addoptionaldetails"
+			>
+				<h3 class="formsection-x-title u-text-dark2"
+				    id="heading-addoptionaldetails"
+				>
+					Adicionar detalhes opcionais
+				</h3>
+
+				<div class="formsection-x-body">
+					<ul>
+						<li class="l-flex l-flex-justifybetween l-flex-aligncenter u-padding-bottom2x">
+							<div class="l-flex l-flex-2x">
+								<svg class="icon icon-dark4"
+								     icon="icon_narrative"
+								></svg>
+								<p class="u-text-body-semibold"
+								   [ngClass]="{'u-text-dark2': !narrativeEnabled, 'u-text-dark4':narrativeEnabled}"
+								>Narrativa</p>
+							</div>
+							<button class="u-text-link-small"
+							        [class.u-text-light4]="narrativeEnabled"
+							        [disabled]="narrativeEnabled"
+							        (click)="narrativeEnabled = true"
+							        type="button"
+							>
+								{{ narrativeEnabled ? "Added" : "Add" }}
+							</button>
+						</li>
+
+						<li class="l-flex l-flex-justifybetween l-flex-aligncenter u-padding-bottom2x">
+							<div class="l-flex l-flex-2x">
+								<svg class="icon icon-dark4"
+								     icon="icon_search"
+								></svg>
+								<p class="u-text-body-semibold"
+								   [ngClass]="{'u-text-dark2': !evidenceEnabled, 'u-text-dark4':evidenceEnabled}"
+								>Evidência</p>
+							</div>
+							<button class="u-text-link-small"
+							        [class.u-text-light4]="evidenceEnabled"
+							        [disabled]="evidenceEnabled"
+							        (click)="enableEvidence()"
+							        type="button"
+							>
+								{{ evidenceEnabled ? "Added" : "Add" }}
+							</button>
+						</li>
+
+						<li class="l-flex l-flex-justifybetween l-flex-aligncenter u-padding-bottom2x">
+							<div class="l-flex l-flex-2x">
+								<svg class="icon icon-dark4"
+								     icon="icon_pending"
+								></svg>
+								<p class="u-text-body-semibold"
+								   [ngClass]="{'u-text-dark2': !expirationEnabled, 'u-text-dark4':expirationEnabled}"
+								>Expiração</p>
+							</div>
+							<button class="u-text-link-small"
+							        [class.u-text-light4]="expirationEnabled"
+							        [disabled]="expirationEnabled"
+							        (click)="toggleExpiration()"
+							        type="button"
+							>
+								{{ expirationEnabled ? "Added" : "Add" }}
+							</button>
+						</li>
+					</ul>
+				</div>
+
+			</div>
+
+
+			<!-- Buttons -->
+			<div class="l-stack l-stack-right">
+				<a [routerLink]="['/issuer/issuers', issuer.slug, 'badges', badgeClass.slug]"
+				   type="submit"
+				   class="button button-secondary"
+				   [disabled-when-requesting]="true"
+				>
+					Cancelar
+				</a>
+				<button type="submit"
+				        class="button"
+				        [disabled]="!! issueBadgeFinished"
+				        [loading-promises]="[ issueBadgeFinished ]"
+				        loading-message="Issuing"
+				>
+					Conceder Badge
+				</button>
+			</div>
+		</form>
+	</div>
+</ng-container>
