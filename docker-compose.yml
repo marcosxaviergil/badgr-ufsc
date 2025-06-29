@@ -1,0 +1,171 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  api:
+    image: registry.setic.ufsc.br/marcosxavier/badgr-deploy/server:master
+    tty: true
+    stdin_open: true
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.hostname == prod-r2-no2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    environment:
+      - PYTHONPATH=/badgr_server/apps
+      - AUTHCODE_SECRET_KEY=ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM92s=
+      - BADGR_APPROVED_ISSUERS_ONLY=True
+
+      # Banco de Dados
+      - BADGR_DB_HOST=db
+      - BADGR_DB_NAME=badgr
+      - BADGR_DB_USER=badgr
+      - BADGR_DB_PASSWORD=${BADGR_DB_PASSWORD}
+      - BADGR_DB_PORT=3306
+
+      # Django
+      - DJANGO_SETTINGS_MODULE=mainsite.settings_local
+      - DEBUG=0
+      - DJANGO_LOG_LEVEL=INFO
+      - ALLOWED_HOSTS=api-badges.setic.ufsc.br,badges.setic.ufsc.br,localhost
+      - HTTP_ORIGIN=${HTTP_ORIGIN}
+      - SITE_ID=1
+
+      # Cache
+      - MEMCACHED=memcached:11211
+
+      # Email - PRODUÇÃO
+      - EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+      - EMAIL_USE_TLS=1
+      - EMAIL_USE_SSL=0
+      - EMAIL_HOST=smtp.sistemas.ufsc.br
+      - EMAIL_PORT=587
+      - DEFAULT_FROM_EMAIL=badges@sistemas.ufsc.br
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}  
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - SERVER_EMAIL=badges@sistemas.ufsc.br
+
+      # Segurança
+      - SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+      - CORS_ALLOWED_ORIGINS=https://badges.setic.ufsc.br,https://api-badges.setic.ufsc.br
+
+      # Fuso horário
+      - USE_TZ=True
+      - TIME_ZONE=${TIME_ZONE}
+
+      # URLs da interface
+      - UI_URL=https://badges.setic.ufsc.br
+      - LOGIN_REDIRECT_URL=https://badges.setic.ufsc.br
+
+      # Segredos
+      - SECRET_KEY=${SECRET_KEY}
+      - UNSUBSCRIBE_SECRET_KEY=${UNSUBSCRIBE_SECRET_KEY}
+
+      # Configurações para Swagger e Estáticos
+      - STATIC_URL=/static/
+      - STATIC_ROOT=/badgr_server/staticfiles/
+      - SWAGGER_GENERATE_ON_STARTUP=1
+      - SERVE_STATIC_FILES=1
+
+    volumes:
+      - static_files:/badgr_server/staticfiles
+      - media_files:/badgr_server/mediafiles
+
+    networks:
+      - shared-network
+
+    depends_on:
+      - db
+      - memcached
+
+    ports:
+      - "8911:8911"
+
+    # ✅ COMANDO ENXUTO: Toda lógica no init_django.sh
+    command: ["./init_django.sh"]
+
+  ui:
+    image: registry.setic.ufsc.br/marcosxavier/badgr-deploy/ui:master
+    tty: true
+    stdin_open: true
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.hostname == prod-r2-no2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    environment:
+      - NODE_ENV=production
+      - PORT=80
+      - HOSTNAME=${HOSTNAME}
+      - API_BASE_URL=${API_BASE_URL}
+    volumes:
+      - ui_files:/app
+    networks:
+      - shared-network
+    ports:
+      - "8915:80"
+
+  db:
+    image: mysql:5.7
+    tty: true
+    stdin_open: true
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == prod-r2-no2
+          - node.role == manager
+    environment:
+      - MYSQL_ROOT_PASSWORD=${BADGR_DB_PASSWORD}
+      - MYSQL_DATABASE=badgr
+      - MYSQL_USER=badgr
+      - MYSQL_PASSWORD=${BADGR_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${BADGR_DB_PASSWORD}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - shared-network
+    ports:
+      - "8913:3306"
+
+  memcached:
+    image: memcached:alpine
+    tty: true
+    stdin_open: true
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == prod-r2-no2
+    networks:
+      - shared-network
+
+networks:
+  shared-network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  db_data:
+    driver: local
+  static_files:
+    driver: local
+  media_files:
+    driver: local
+  ui_files:
+    driver: local
